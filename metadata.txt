@@ -1,0 +1,11 @@
+[general]
+name=MyFlamma
+description=QGIS plugin for fire simulation and LiDAR analysis
+about=MyFlamma is an open-source plugin providing tools for fire simulation and LiDAR data analysis.
+version=1.0.0
+qgisMinimumVersion=3.18
+author=pablo natera muñoz
+email=natera@unex.es
+repository=https://github.com/Skoolzon3/MyLiDAR
+icon=icons/myFlamma_logo.png
+tags=LiDAR, LAS, LAZ, processing, classification, pre-processing, filtering, point cloud, points, pointcloud, DEM
