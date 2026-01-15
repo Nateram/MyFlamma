@@ -1,4 +1,4 @@
-from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton,QDialogButtonBox, QFileDialog, QLineEdit, QSizePolicy, QTextBrowser, QWidget, QSpacerItem, QGroupBox, QFormLayout, QDoubleSpinBox
+from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton,QDialogButtonBox, QFileDialog, QLineEdit, QSizePolicy, QTextBrowser, QWidget, QSpacerItem, QGroupBox, QFormLayout, QDoubleSpinBox, QCheckBox
 from qgis.PyQt.QtCore import Qt
 from qgis.core import QgsProject, QgsPointCloudLayer
 import os
@@ -16,8 +16,8 @@ class VegetationClassificationDialog(QDialog):
 
         # --- Window ---
         self.setWindowTitle(self.tr("Classify Vegetation"))
-        self.resize(850, 500)
-        self.setMinimumWidth(800)
+        self.resize(900, 550)
+        self.setMinimumWidth(850)
 
         # --- Layout ---
         main_layout = QHBoxLayout(self)
@@ -86,6 +86,47 @@ class VegetationClassificationDialog(QDialog):
         self.high_thresh_spin.valueChanged.connect(self.validate_thresholds)
 
         left_layout.addWidget(param_group)
+        
+        # --- Size classification group ---
+        size_group = QGroupBox(self.tr("Size Classification"))
+        size_layout = QFormLayout(size_group)
+        size_layout.setLabelAlignment(Qt.AlignRight)
+        
+        # Height threshold for shrubs/trees
+        self.size_threshold_spin = QDoubleSpinBox()
+        self.size_threshold_spin.setRange(0.1, 100.0)
+        self.size_threshold_spin.setSingleStep(0.1)
+        self.size_threshold_spin.setDecimals(2)
+        self.size_threshold_spin.setValue(2.0)
+        self.size_threshold_spin.setSuffix(" m")
+        self.size_threshold_spin.setToolTip(self.tr("Trees >= this height, Shrubs < this height"))
+        size_layout.addRow(self.tr("Shrub/Tree threshold:"), self.size_threshold_spin)
+        
+        left_layout.addWidget(size_group)
+        
+        # --- Export options group ---
+        export_group = QGroupBox(self.tr("Export Options"))
+        export_layout = QVBoxLayout(export_group)
+        
+        # CSV export checkboxes
+        self.export_trees_check = QCheckBox(self.tr("Export trees to CSV"))
+        self.export_trees_check.setChecked(True)
+        self.export_trees_check.setToolTip(self.tr("Save detected trees to _metrics.csv"))
+        export_layout.addWidget(self.export_trees_check)
+        
+        self.export_shrubs_check = QCheckBox(self.tr("Export shrubs to CSV"))
+        self.export_shrubs_check.setChecked(True)
+        self.export_shrubs_check.setToolTip(self.tr("Save detected shrubs to _shrubs.csv"))
+        export_layout.addWidget(self.export_shrubs_check)
+        
+        left_layout.addWidget(export_group)
+        
+        # --- Old export checkbox (hidden for compatibility) ---
+        self.export_csv_check = QCheckBox(self.tr("Export trees to CSV file"))
+        self.export_csv_check.setChecked(True)
+        self.export_csv_check.setVisible(False)
+        left_layout.addWidget(self.export_csv_check)
+        
         left_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
         # --- OK / Cancel buttons ---
@@ -247,6 +288,18 @@ class VegetationClassificationDialog(QDialog):
     def get_input_output(self):
         """Return (input_path, output_path)."""
         return self.selected_input, self.output_edit.text().strip()
+
+    def get_export_csv(self):
+        """Return whether to export trees to CSV."""
+        return self.export_csv_check.isChecked()
+    
+    def get_size_threshold(self):
+        """Return the height threshold for separating shrubs and trees."""
+        return self.size_threshold_spin.value()
+    
+    def get_export_options(self):
+        """Return export options (trees, shrubs)."""
+        return self.export_trees_check.isChecked(), self.export_shrubs_check.isChecked()
 
     def validate_thresholds(self):
         low = self.low_thresh_spin.value()

@@ -11,7 +11,7 @@ from qgis.core import Qgis, QgsApplication
 # --- Method-specific imports ---
 from .tools_suite.outlier_removal.outlier_removal import remove_outliers
 from .tools_suite.point_filtering.point_filtering import filter_points
-from .tools_suite.vegetation_classification.vegetation_classification import classify_vegetation
+from .tools_suite.vegetation_classification.vegetation_classification_chm import classify_vegetation
 from .tools_suite.building_count.building_count import count_buildings
 from .tools_suite.dem_generation.dem_generation import generate_bare_earth_dem
 from .tools_suite.report_generation.report_generation import generate_report
@@ -68,7 +68,7 @@ class MyFlammaPlugin:
         actions = [
             ("cleanup.png", self.tr("Remove Outlier Points"), self.outlier_removal),
             ("filter.png", self.tr("Filter Points by Classification"), self.point_filtering),
-            ("vegetation.png", self.tr("Classify Vegetation"), self.vegetation_classification),
+            ("vegetation.png", self.tr("Classify Vegetation"), self.vegetation_classification_chm),
             ("building.png", self.tr("Count Buildings"), self.building_count),
             ("dem.png", self.tr("Generate Bare Earth DEM"), self.bare_earth_dem_generation),
             ("report.png", self.tr("Generate LiDAR File Report"), self.report_generation),
@@ -114,8 +114,8 @@ class MyFlammaPlugin:
     def building_count(self):
         count_buildings(self)
 
-    # --- Vegetation Classification ---
-    def vegetation_classification(self):
+    # --- Vegetation Classification (CHM Method) ---
+    def vegetation_classification_chm(self):
         classify_vegetation(self)
 
     # --- Bare Earth DEM Generation ---

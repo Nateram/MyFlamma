@@ -103,7 +103,8 @@
   "Vegetation classification failed": "La clasificación de vegetación falló",
   "Error During Classification": "Error durante la clasificación",
   "Classifying vegetation in": "Clasificando vegetación en",
-  "Classifying vegetation in the background": "Clasificando vegetaciónen segundo plano",
+  "Classifying vegetation in the background": "Clasificando vegetación en segundo plano",
+  "Method": "Método",
 
 
 
@@ -334,5 +335,12 @@
   "Coordinates (X,Y):": "Coordenadas (X,Y):",
   "Add Point": "Añadir Punto",
   "Invalid Coordinates": "Coordenadas Inválidas",
-  "Please enter coordinates in the format X,Y": "Por favor ingrese coordenadas en el formato X,Y"
+  "Please enter coordinates in the format X,Y": "Por favor ingrese coordenadas en el formato X,Y",
+  "Export trees to CSV file": "Exportar árboles a archivo CSV",
+  "CSV exported to": "CSV exportado a",
+  "Very Small": "Muy Pequeño",
+  "Small": "Pequeño",
+  "Medium": "Medio",
+  "Large": "Grande",
+  "Very Large": "Muy Grande"
 }

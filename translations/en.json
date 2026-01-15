@@ -101,6 +101,10 @@
   "Error During Classification": "Error During Classification",
   "Classifying vegetation in": "Classifying vegetation in",
   "Classifying vegetation in the background": "Classifying vegetation in the background",
+  "Method": "Method",
+
+
+
 
 
 
@@ -329,5 +333,12 @@
   "Coordinates (X,Y):": "Coordinates (X,Y):",
   "Add Point": "Add Point",
   "Invalid Coordinates": "Invalid Coordinates",
-  "Please enter coordinates in the format X,Y": "Please enter coordinates in the format X,Y"
+  "Please enter coordinates in the format X,Y": "Please enter coordinates in the format X,Y",
+  "Export trees to CSV file": "Export trees to CSV file",
+  "CSV exported to": "CSV exported to",
+  "Very Small": "Very Small",
+  "Small": "Small",
+  "Medium": "Medium",
+  "Large": "Large",
+  "Very Large": "Very Large"
 }
