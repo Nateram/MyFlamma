@@ -15,8 +15,8 @@ class VegetationClassificationDialog(QDialog):
         self.user_edited_output = False
 
         # --- Window ---
-        self.setWindowTitle(self.tr("Classify Vegetation"))
-        self.resize(900, 550)
+        self.setWindowTitle(self.tr("Classify Data"))
+        self.resize(900, 600)
         self.setMinimumWidth(850)
 
         # --- Layout ---
@@ -119,6 +119,21 @@ class VegetationClassificationDialog(QDialog):
         self.export_shrubs_check.setToolTip(self.tr("Save detected shrubs to _shrubs.csv"))
         export_layout.addWidget(self.export_shrubs_check)
         
+        self.export_grass_check = QCheckBox(self.tr("Export grass areas to CSV"))
+        self.export_grass_check.setChecked(False)
+        self.export_grass_check.setToolTip(self.tr("Save detected grass cell details to _grass_areas.csv (grass visualization always shown)"))
+        export_layout.addWidget(self.export_grass_check)
+        
+        self.export_buildings_check = QCheckBox(self.tr("Export buildings to CSV"))
+        self.export_buildings_check.setChecked(True)
+        self.export_buildings_check.setToolTip(self.tr("Save detected buildings to _buildings.csv"))
+        export_layout.addWidget(self.export_buildings_check)
+        
+        self.export_reclassified_check = QCheckBox(self.tr("Export reclassified LAZ"))
+        self.export_reclassified_check.setChecked(False)
+        self.export_reclassified_check.setToolTip(self.tr("Save a reclassified LAZ file with grass points changed from Class 2 to Class 3"))
+        export_layout.addWidget(self.export_reclassified_check)
+        
         left_layout.addWidget(export_group)
         
         # --- Old export checkbox (hidden for compatibility) ---
@@ -149,21 +164,21 @@ class VegetationClassificationDialog(QDialog):
             }
         """)
 
-        title = self.tr("Vegetation Classification")
+        title = self.tr("Data Classification")
         intro = self.tr(
-            "This tool classifies vegetation points in a LiDAR dataset into low, medium, and high vegetation "
-            "categories based on their height above ground."
+            "This tool classifies LiDAR data into vegetation categories (trees, shrubs, grass) "
+            "and buildings, extracting metrics and exporting results to CSV."
         )
         workflow = self.tr("Workflow:")
-        step1 = self.tr("Detects ground and high vegetation points in the dataset.")
-        step2 = self.tr("Estimates local ground elevation using nearest neighbors.")
-        step3 = self.tr("Calculates point height above ground and classifies accordingly:")
-        sub1 = self.tr("Low vegetation: height < low threshold")
-        sub2 = self.tr("Medium vegetation: between thresholds")
-        sub3 = self.tr("High vegetation: height > high threshold")
+        step1 = self.tr("Detects trees using CHM (Canopy Height Model) with Gaussian smoothing.")
+        step2 = self.tr("Detects shrubs using DBSCAN clustering on medium vegetation (Class 4).")
+        step3 = self.tr("Detects grass areas using ExG color index and existing Class 3 points.")
+        sub1 = self.tr("Detects buildings using DBSCAN clustering on Class 6 points.")
+        sub2 = self.tr("Optionally exports reclassified LAZ (grass Class 2 → Class 3).")
+        sub3 = self.tr("Exports CSV files with coordinates and metrics for each category.")
         note = self.tr(
-            "The classified LiDAR file will contain new classification codes corresponding to the vegetation height "
-            "detected by the thresholds: 3 (low) and 4 (medium)."
+            "Each detected element includes coordinates (X, Y), height, crown diameter, area, "
+            "point density, and RGB color for optimal export to FlamMap or Unity."
         )
 
         desc_html = f"""
@@ -298,8 +313,12 @@ class VegetationClassificationDialog(QDialog):
         return self.size_threshold_spin.value()
     
     def get_export_options(self):
-        """Return export options (trees, shrubs)."""
-        return self.export_trees_check.isChecked(), self.export_shrubs_check.isChecked()
+        """Return export options (trees, shrubs, grass, buildings, reclassified_laz)."""
+        return (self.export_trees_check.isChecked(), 
+                self.export_shrubs_check.isChecked(), 
+                self.export_grass_check.isChecked(),
+                self.export_buildings_check.isChecked(),
+                self.export_reclassified_check.isChecked())
 
     def validate_thresholds(self):
         low = self.low_thresh_spin.value()

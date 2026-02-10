@@ -1,0 +1,16 @@
+\section{Related Work}
+\label{sec:relatedwork}
+
+\subsection{LiDAR-Based Vegetation Classification}
+
+Individual tree detection (ITD) from airborne LiDAR has been extensively studied. The most common approaches fall into two categories: raster-based methods that operate on a Canopy Height Model (CHM), and point-based methods that cluster the 3D point cloud directly. CHM approaches~\cite{popescu2004} rasterize the normalized point heights onto a grid and apply local maximum filtering to locate tree tops, followed by region growing or watershed segmentation to delineate crowns. Point-based approaches use algorithms such as DBSCAN~\cite{ester1996dbscan} or mean-shift to group points into individual tree clusters without rasterization. Hybrid methods that combine both paradigms have shown improved accuracy in heterogeneous forests~\cite{zhen2016}.
+
+Shrub detection is comparatively underexplored. Low vegetation classes (ASPRS classes 3--4) are typically treated as a homogeneous layer. Recent work has applied density-based clustering to identify individual shrub clusters, but standardized benchmarks remain scarce.
+
+\subsection{3D Scene Generation for Fire Simulation}
+
+Fire behavior simulators such as FlamMap~\cite{finney2006} and FARSITE require spatially distributed fuel inputs, often in raster form. However, emerging physics-based simulators and serious-game environments benefit from explicit 3D representations of vegetation and structures. Tools like \textit{fuel3D}~\cite{parsons2011} generate voxelized fuel beds from LiDAR, while game-engine integrations (Unity, Unreal) increasingly support OBJ/FBX import for interactive visualization.
+
+\subsection{QGIS Plugin Ecosystem}
+
+QGIS supports Python-based plugins with access to the full Qt widget toolkit and background task infrastructure (\texttt{QgsTask}). Existing LiDAR plugins focus primarily on point cloud rendering and DEM generation; to our knowledge, no existing plugin provides an end-to-end pipeline from LiDAR classification to 3D OBJ export with material assignment.

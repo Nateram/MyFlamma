@@ -1,0 +1,18 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Wildfires represent one of the most destructive natural hazards in Mediterranean ecosystems, with increasing severity driven by climate change and land-use patterns~\cite{bowman2009fire}. Effective wildfire risk assessment in wildland-urban interface (WUI) zones demands detailed, spatially explicit information about fuel loads, vegetation structure, and building exposure. Airborne LiDAR (Light Detection and Ranging) has become a primary data source for deriving such information, providing dense three-dimensional point clouds that capture canopy height, vegetation density, and terrain morphology at sub-meter resolution~\cite{riano2003}.
+
+Despite the availability of national LiDAR programs such as PNOA in Spain, practitioners often lack accessible tools to bridge the gap between raw point cloud data and actionable 3D visualizations. Commercial software packages exist, but their cost and complexity limit adoption by local fire management agencies. Open-source GIS platforms, particularly QGIS, offer an extensible framework for geospatial analysis; however, they provide limited native support for LiDAR-based vegetation classification and 3D scene generation.
+
+This paper presents \textbf{MyFlamma}, a QGIS plugin that addresses this gap by providing an integrated pipeline from LiDAR point cloud ingestion to classified 3D scene export. The plugin operates in two stages: (1)~an automated classification module that identifies individual trees, shrubs, grass areas, and buildings from classified LAS/LAZ files, and (2)~an OBJ export module that converts the classified elements into lightweight geometric primitives suitable for import into 3D engines.
+
+The main contributions of this work are:
+\begin{itemize}
+    \item A hybrid classification approach combining CHM-based tree detection, DBSCAN clustering for shrubs and buildings, and spectral (ExG) filtering for grass.
+    \item A lightweight \textit{quick classify} pipeline that runs entirely in memory without generating intermediate files.
+    \item An OBJ/MTL export module that produces closed, watertight geometry with proper materials for direct use in Unity, Blender, or fire simulation tools such as FlamMap.
+    \item Full integration as a QGIS plugin with background task execution and bilingual (EN/ES) interface.
+\end{itemize}
+
+The remainder of this paper is organized as follows: Section~\ref{sec:relatedwork} reviews related work, Section~\ref{sec:methodology} describes the methodology, Section~\ref{sec:results} presents preliminary results, Section~\ref{sec:discussion} discusses limitations, and Section~\ref{sec:conclusions} concludes.

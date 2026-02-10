@@ -9,13 +9,9 @@ from qgis.PyQt.QtWidgets import QAction, QMessageBox, QMenu
 from qgis.core import Qgis, QgsApplication
 
 # --- Method-specific imports ---
-from .tools_suite.outlier_removal.outlier_removal import remove_outliers
-from .tools_suite.point_filtering.point_filtering import filter_points
 from .tools_suite.vegetation_classification.vegetation_classification_chm import classify_vegetation
-from .tools_suite.building_count.building_count import count_buildings
-from .tools_suite.dem_generation.dem_generation import generate_bare_earth_dem
-from .tools_suite.report_generation.report_generation import generate_report
 from .tools_suite.flammap_export.flammap_export import FlamMapExportDialog, FlamMapExportTask
+from .tools_suite.obj_export.obj_export import export_to_obj
 
 # -----------------------------
 # --- My LiDAR Plugin Class ---
@@ -25,15 +21,13 @@ class MyFlammaPlugin:
         self.iface = iface
         self.plugin_dir = os.path.dirname(__file__)
         self.running_tasks = []
+        self.last_classification_data = None  # Para export OBJ
 
         self.translations = {}
         system_lang = QLocale.system().name()[:2] # Detect system language ("en", "es")
         self.current_lang = system_lang if system_lang else "en"
         self.load_language(self.current_lang)
 
-        self.report_action = None
-        self.filter_action = None
-        self.flammap_action = None
         self.ignition_points = []
         self.settings = QSettings()
         self.ignition_points = self.settings.value("MyFlamma/ignition_points", [])
@@ -66,14 +60,9 @@ class MyFlammaPlugin:
             menubar.addMenu(self.menu)
 
         actions = [
-            ("cleanup.png", self.tr("Remove Outlier Points"), self.outlier_removal),
-            ("filter.png", self.tr("Filter Points by Classification"), self.point_filtering),
-            ("vegetation.png", self.tr("Classify Vegetation"), self.vegetation_classification_chm),
-            ("building.png", self.tr("Count Buildings"), self.building_count),
-            ("dem.png", self.tr("Generate Bare Earth DEM"), self.bare_earth_dem_generation),
-            ("report.png", self.tr("Generate LiDAR File Report"), self.report_generation),
+            ("vegetation.png", self.tr("Classify Data"), self.vegetation_classification_chm),
             ("fire.png", self.tr("Export to FlamMap"), self.export_flammap),
-            ("fire.png", self.tr("Fast Fire Simulation"), self.run_fast_simulation)
+            ("vegetation.png", self.tr("Export to OBJ"), self.export_obj),
         ]
 
         self.actions = []
@@ -83,48 +72,14 @@ class MyFlammaPlugin:
             action.triggered.connect(callback)
             self.menu.addAction(action)
             self.actions.append(action)
-    # --- Fast Fire Simulation ---
-    def run_fast_simulation(self):
-        from .tools_suite.fire_simulation.fire_sim_dialog import FireSimulationDialog
-        from .tools_suite.fire_simulation.fire_simulation import FireSimulationRunner
-        dlg = FireSimulationDialog(self.iface.mainWindow())
-        if dlg.exec_():
-            params = dlg.get_parameters()
-            if not params['lidar_path'] or not params['exe_path']:
-                self.iface.messageBar().pushMessage("Error", "Faltan archivos (Lidar o Exe)", level=Qgis.Critical)
-                return
-            task = FireSimulationRunner(params, self.iface)
-            QgsApplication.taskManager().addTask(task)
-
-    def unload(self):
-        if self.menu:
-            self.iface.mainWindow().menuBar().removeAction(self.menu.menuAction())
-        self.menu = None
-        self.actions = []
-
-    # --- Outlier Removal ---
-    def outlier_removal(self):
-        remove_outliers(self)
-
-    # --- Point Filtering ---
-    def point_filtering(self):
-        filter_points(self)
-
-    # --- Builing Count ---
-    def building_count(self):
-        count_buildings(self)
 
     # --- Vegetation Classification (CHM Method) ---
     def vegetation_classification_chm(self):
         classify_vegetation(self)
 
-    # --- Bare Earth DEM Generation ---
-    def bare_earth_dem_generation(self):
-        generate_bare_earth_dem(self)
-
-    # --- Report Generation ---
-    def report_generation(self):
-        generate_report(self)
+    # --- OBJ Export ---
+    def export_obj(self):
+        export_to_obj(self)
 
     # --- FlamMap Export ---
     def export_flammap(self):
@@ -167,3 +122,9 @@ class MyFlammaPlugin:
             level=Qgis.Info,
             duration=-1
         )
+
+    def unload(self):
+        if self.menu:
+            self.iface.mainWindow().menuBar().removeAction(self.menu.menuAction())
+        self.menu = None
+        self.actions = []

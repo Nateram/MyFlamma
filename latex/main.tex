@@ -1,0 +1,52 @@
+\documentclass[conference]{IEEEtran}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{tabularx}
+\usepackage{ragged2e}
+
+% Bibliography file
+\bibliographystyle{IEEEtran}
+
+\begin{document}
+
+% Title and author
+\title{Exporting 3D Models from QGIS: A Tool for Wildfire Risk Assessment and Management}
+
+\author{
+    \IEEEauthorblockN{Pablo Natera Muñoz}
+    \IEEEauthorblockA{
+        Universidad de Extremadura \\
+        Email: natera@unex.es
+    }
+}
+
+\maketitle
+
+% Abstract
+\begin{abstract}
+Wildfire risk assessment in wildland-urban interface (WUI) areas requires detailed knowledge of vegetation distribution and building exposure. This paper presents MyFlamma, an open-source QGIS plugin that processes airborne LiDAR point clouds to automatically classify vegetation (trees, shrubs, grass) and buildings, and exports the results as lightweight 3D OBJ models. The tool chain combines a Canopy Height Model (CHM) with Gaussian peak detection for individual tree delineation, DBSCAN clustering for shrub and building segmentation, and an Excess Green (ExG) index for grass area identification. A companion \textit{Export to OBJ} module converts the classified elements into simple geometric primitives---boxes, quads, and extruded footprints---suitable for visualization in standard 3D engines such as Unity or Blender. We describe the methodology, implementation architecture, and preliminary results obtained from PNOA LiDAR datasets in Spain, demonstrating that the plugin can process multi-million-point datasets on commodity hardware and produce georeferenced 3D scenes useful for wildfire simulation planning.
+\end{abstract}
+
+
+\begin{IEEEkeywords}
+LiDAR, QGIS, vegetation classification, 3D export, OBJ, wildfire risk, point cloud, CHM, DBSCAN
+\end{IEEEkeywords}
+
+% Sections
+\input{sections/01-introduction}
+\input{sections/02-relatedwork}
+\input{sections/03-methodology}
+\input{sections/04-results}
+\input{sections/05-discussion}
+\input{sections/06-conclusions}
+
+% References
+\bibliography{refs}
+
+\end{document}

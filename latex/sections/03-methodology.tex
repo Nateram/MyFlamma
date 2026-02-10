@@ -1,0 +1,59 @@
+\section{Methodology}
+\label{sec:methodology}
+
+The MyFlamma pipeline consists of two principal modules: a \textit{classification engine} that extracts vegetation and building features from LAS/LAZ point clouds, and an \textit{OBJ export engine} that converts the classified data into 3D geometry. Fig.~\ref{fig:pipeline} summarizes the overall workflow.
+
+\subsection{Classification Engine}
+
+\subsubsection{Input and Preprocessing}
+The input is a classified LAS/LAZ file (ASPRS standard classes: 2=ground, 3=low vegetation, 4=medium vegetation, 5=high vegetation, 6=building). Coordinates and optional RGB color channels are extracted using \texttt{laspy}. Heights are normalized by subtracting the nearest ground point elevation, computed via a 2D KD-tree query on class-2 points.
+
+\subsubsection{Tree Detection (CHM + Peak Merging)}
+High vegetation points (classes 5--6) with normalized height above a user-defined threshold (default 2\,m) are rasterized onto a CHM grid with 0.5\,m pixel size. A Gaussian filter ($\sigma=1.5$) smooths the CHM, and local maxima are extracted using a $7\times7$ window. Peaks are then merged using a height-dependent radius: smaller radii for short trees, larger radii for tall canopies. This avoids both over-segmentation of large crowns and under-segmentation of dense stands. For each merged peak, crown diameter is estimated from the spatial extent of assigned points, and RGB color is averaged.
+
+For the lightweight \textit{quick classify} variant (used by the OBJ export), DBSCAN clustering ($\varepsilon=3.0$\,m, $n_{\min}=5$) is applied directly on the 2D coordinates of the normalized high-vegetation points, producing one cluster per tree without the CHM rasterization step.
+
+\subsubsection{Shrub Detection (DBSCAN)}
+Medium vegetation points (class 4) are clustered with DBSCAN ($\varepsilon=2.0$\,m, $n_{\min}=3$). Each cluster yields a centroid, maximum normalized height, crown diameter (geometric mean of X and Y spread), and average color. Height is capped at 3\,m and diameter at 2\,m to prevent misclassified tall objects from inflating shrub geometry.
+
+\subsubsection{Grass Detection (ExG + Class 3)}
+Grass areas combine two sources: (a)~all class-3 (low vegetation) points, included unconditionally, and (b)~class-2 (ground) points that pass an Excess Green index filter: $\text{ExG} = 2G - R - B > 12$, with additional constraints $G>R$ and $G>B$. Valid points are binned into a 2\,m$\times$2\,m grid; each occupied cell is recorded with its bounding box, point count, and mean color.
+
+\subsubsection{Building Detection (DBSCAN + Grid)}
+Building points (class 6) are clustered with DBSCAN ($\varepsilon=3.0$\,m, $n_{\min}=10$). Within each cluster, points are binned into a 2\,m$\times$2\,m grid. Per-cell metrics include maximum and mean normalized height. Building height is capped at 50\,m to reject outliers.
+
+\subsection{OBJ Export Engine}
+
+The export module converts classified features into OBJ geometry with an accompanying MTL material file. A coordinate transformation maps LiDAR $(X,Y)$ to OBJ $(X,Z)$ and normalized height to $Y$ (Y-up convention). A local origin offset ensures vertex coordinates remain small.
+
+\subsubsection{Geometry Primitives}
+\begin{itemize}
+    \item \textbf{Ground}: A single double-sided quad at $Y=0$, padded beyond the scene extent. Material: dark grey.
+    \item \textbf{Grass}: Double-sided quads at $Y=0.05$\,m for each occupied grid cell. Material: green.
+    \item \textbf{Shrubs}: Closed axis-aligned boxes (6 faces, CCW winding). Width from crown diameter, height from normalized height. Material: dark green.
+    \item \textbf{Trees}: Each tree consists of a narrow trunk box and a wider crown box stacked vertically. Materials: brown trunk, green crown.
+    \item \textbf{Buildings}: Closed extruded boxes per grid cell, height from maximum normalized height. Material: orange.
+\end{itemize}
+
+All box faces use counter-clockwise vertex winding with outward-facing normals, ensuring watertight, closed meshes viewable from any angle in standard 3D renderers.
+
+\subsubsection{Material System}
+Six named materials are defined in the MTL file with diffuse color (\texttt{Kd}), ambient (\texttt{Ka}), and opacity (\texttt{d}). The palette is optimized for visual clarity in fire risk assessment contexts.
+
+\begin{table}[h]
+\centering
+\caption{OBJ Material Definitions}
+\label{tab:materials}
+\begin{tabular}{lcc}
+\hline
+\textbf{Element} & \textbf{Material} & \textbf{Kd (R,G,B)} \\
+\hline
+Ground   & \texttt{mat\_ground}   & (0.25, 0.25, 0.25) \\
+Grass    & \texttt{mat\_grass}    & (0.20, 0.65, 0.15) \\
+Shrubs   & \texttt{mat\_shrub}    & (0.15, 0.55, 0.10) \\
+Trunk    & \texttt{mat\_trunk}    & (0.45, 0.28, 0.10) \\
+Crown    & \texttt{mat\_crown}    & (0.10, 0.55, 0.10) \\
+Building & \texttt{mat\_building} & (0.95, 0.64, 0.14) \\
+\hline
+\end{tabular}
+\end{table}
