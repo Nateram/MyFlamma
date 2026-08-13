@@ -8,8 +8,8 @@ Geometry conventions (Y-up for Unity):
   - Height   → OBJ Y  (up)
 
 Shapes:
-  Ground   – flat quad at Y=0
-  Grass    – grid of 2m×2m quads at Y=0.05 (slightly above ground)
+  Ground   – triangulated terrain mesh with real elevation (double-sided)
+  Grass    – terrain faces painted green (same mesh, different material)
   Shrubs   – cubes (width = crown_diam, height = Height_m)
   Trees    – rectangular trunk + cube crown
   Buildings – extruded boxes per cell (width from cell bounds, height from Height_Max_m)
@@ -72,6 +72,34 @@ class ObjWriter:
         self._add_face([(v1, n_up), (v4, n_up), (v3, n_up), (v2, n_up)])
         # Bottom face (CCW seen from below)
         self._add_face([(v1, n_down), (v2, n_down), (v3, n_down), (v4, n_down)])
+
+    def add_inclined_quad(self, v1, v2, v3, v4):
+        """Double-sided inclined quad with per-corner elevation.
+        v1..v4 are (x, y, z) tuples; v1=front-left, v2=front-right,
+        v3=back-right, v4=back-left.  Winding is CCW from above."""
+        i1 = self._vi(*v1)
+        i2 = self._vi(*v2)
+        i3 = self._vi(*v3)
+        i4 = self._vi(*v4)
+
+        # Normal via cross(v4-v1, v2-v1) → points up for CCW face
+        e1 = (v4[0]-v1[0], v4[1]-v1[1], v4[2]-v1[2])
+        e2 = (v2[0]-v1[0], v2[1]-v1[1], v2[2]-v1[2])
+        nx = e1[1]*e2[2] - e1[2]*e2[1]
+        ny = e1[2]*e2[0] - e1[0]*e2[2]
+        nz = e1[0]*e2[1] - e1[1]*e2[0]
+        ln = (nx**2 + ny**2 + nz**2)**0.5
+        if ln > 0:
+            nx, ny, nz = nx/ln, ny/ln, nz/ln
+        else:
+            nx, ny, nz = 0, 1, 0
+        n_top = self._ni(nx, ny, nz)
+        n_bot = self._ni(-nx, -ny, -nz)
+
+        # Top face (CCW from above)
+        self._add_face([(i1, n_top), (i4, n_top), (i3, n_top), (i2, n_top)])
+        # Bottom face (reversed winding)
+        self._add_face([(i1, n_bot), (i2, n_bot), (i3, n_bot), (i4, n_bot)])
 
     def add_box(self, x_min, z_min, x_max, z_max, y_base, y_top):
         """Closed axis-aligned box with 6 faces, all CCW winding (outward normals)."""
@@ -162,13 +190,13 @@ class ObjWriter:
 class ObjExportTask(QgsTask):
     """Background task that generates .obj + .mtl from in-memory data."""
 
-    def __init__(self, description, trees, shrubs, grass, buildings, roads, params, output_path, plugin_ref, translator):
+    def __init__(self, description, trees, shrubs, grass, buildings, params, output_path, plugin_ref, translator, terrain=None):
         super().__init__(description, QgsTask.CanCancel)
         self.trees = trees or []
         self.shrubs = shrubs or []
         self.grass = grass or []
         self.buildings = buildings or []
-        self.roads = roads or []
+        self.terrain = terrain  # terrain DEM dict or None
         self.params = params
         self.output_path = output_path
         self.plugin = plugin_ref
@@ -188,11 +216,14 @@ class ObjExportTask(QgsTask):
             return False
 
     def _generate(self):
+        import numpy as np
+
         p = self.params
         scale = p.get('scale', 1.0)
         padding = p.get('ground_padding', 10) * scale
+        include_terrain = p.get('include_terrain', True)
 
-        total = len(self.trees) + len(self.shrubs) + len(self.grass) + len(self.buildings) + len(self.roads)
+        total = len(self.trees) + len(self.shrubs) + len(self.grass) + len(self.buildings)
         if total == 0:
             self.error_msg = "No classification data available."
             return False
@@ -200,7 +231,7 @@ class ObjExportTask(QgsTask):
         QgsMessageLog.logMessage(
             f"OBJ Export: {len(self.trees)} trees, {len(self.shrubs)} shrubs, "
             f"{len(self.grass)} grass areas, {len(self.buildings)} buildings, "
-            f"{len(self.roads)} road areas",
+            f"terrain={'yes' if self.terrain else 'no'}",
             "MyFlamma", Qgis.Info
         )
 
@@ -226,13 +257,6 @@ class ObjExportTask(QgsTask):
                 all_x.append(cell['x_max'])
                 all_z.append(cell['y_min'])
                 all_z.append(cell['y_max'])
-        for road in self.roads:
-            for cell in road.get('cell_details', []):
-                all_x.append(cell['x_min'])
-                all_x.append(cell['x_max'])
-                all_z.append(cell['y_min'])
-                all_z.append(cell['y_max'])
-
         if not all_x:
             self.error_msg = "Could not determine scene bounds."
             return False
@@ -246,36 +270,209 @@ class ObjExportTask(QgsTask):
         scene_x_max = (max(all_x) - origin_x) * scale
         scene_z_max = (origin_z - min(all_z)) * scale  # flipped
 
+        # --- Terrain elevation helper ---
+        # Build a numpy array for fast terrain lookups
+        terrain_grid_np = None
+        terrain_z_base = 0.0
+        terrain_x_min = 0.0
+        terrain_y_min = 0.0
+        terrain_cell = 2.0
+        terrain_cols = 0
+        terrain_rows = 0
+
+        if self.terrain and include_terrain:
+            terrain_z_base = self.terrain['z_base']
+            terrain_x_min = self.terrain['x_min']
+            terrain_y_min = self.terrain['y_min']
+            terrain_cell = self.terrain['cell_size']
+            terrain_cols = self.terrain['cols']
+            terrain_rows = self.terrain['rows']
+            terrain_grid_np = np.array(self.terrain['z_grid'], dtype=np.float64)
+
+        def get_terrain_elev(lidar_x, lidar_y):
+            """Get terrain elevation at a LiDAR coordinate using bilinear
+            interpolation, returns OBJ Y value.  This ensures grass quads
+            track the actual terrain surface on steep slopes."""
+            if terrain_grid_np is None:
+                return 0.0
+            # Fractional grid position
+            fc = (lidar_x - terrain_x_min) / terrain_cell
+            fr = (lidar_y - terrain_y_min) / terrain_cell
+            # Integer corners (clamped)
+            c0 = max(0, min(int(np.floor(fc)), terrain_cols - 2))
+            r0 = max(0, min(int(np.floor(fr)), terrain_rows - 2))
+            c1 = c0 + 1
+            r1 = r0 + 1
+            # Fractional part
+            t = fc - c0  # 0..1 along column axis
+            s = fr - r0  # 0..1 along row axis
+            t = max(0.0, min(t, 1.0))
+            s = max(0.0, min(s, 1.0))
+            # Bilinear interpolation
+            z00 = terrain_grid_np[r0, c0]
+            z01 = terrain_grid_np[r0, c1]
+            z10 = terrain_grid_np[r1, c0]
+            z11 = terrain_grid_np[r1, c1]
+            z_interp = (1 - s) * ((1 - t) * z00 + t * z01) + s * ((1 - t) * z10 + t * z11)
+            return (z_interp - terrain_z_base) * scale
+
         writer = ObjWriter()
 
         # --- Materials ---
         materials = {
-            'mat_ground':       {'Kd': (0.25, 0.25, 0.25), 'd': 1.0},   # dark grey
+            'mat_ground':       {'Kd': (0.12, 0.12, 0.12), 'd': 1.0},   # very dark grey
             'mat_grass':        {'Kd': (0.20, 0.65, 0.15), 'd': 1.0},   # green
             'mat_shrub':        {'Kd': (0.08, 0.35, 0.05), 'd': 1.0},   # very dark green
             'mat_trunk':        {'Kd': (0.45, 0.28, 0.10), 'd': 1.0},   # brown
             'mat_crown':        {'Kd': (0.10, 0.55, 0.10), 'd': 1.0},   # green
             'mat_building':     {'Kd': (0.95, 0.64, 0.14), 'd': 1.0},   # orange
-            'mat_road':         {'Kd': (0.10, 0.10, 0.10), 'd': 1.0},   # near-black
         }
 
         progress_done = 0
         progress_total = (1 if p.get('include_ground') else 0) + \
                          len(self.grass) + len(self.shrubs) + len(self.trees) + \
-                         len(self.buildings) + len(self.roads)
+                         len(self.buildings)
         if progress_total == 0:
             progress_total = 1
 
         # =====================================================================
-        #  1. GROUND PLANE
+        #  1. GROUND / TERRAIN MESH  +  2. GRASS (painted on terrain)
         # =====================================================================
-        if p.get('include_ground', True):
-            writer.begin_group('Ground', 'mat_ground')
-            writer.add_quad(
-                scene_x_min - padding, scene_z_min - padding,
-                scene_x_max + padding, scene_z_max + padding,
-                y=0.0
+        #  Grass is NOT a separate layer. Instead, terrain faces that fall
+        #  inside a classified grass cell are assigned mat_grass. This
+        #  guarantees 100 % alignment (same vertices, same triangles).
+        #
+        #  Before painting, we:
+        #   a) Remove isolated grass cells (no 4-connected neighbour)
+        #   b) Fill small holes (non-grass cell surrounded by ≥3 grass
+        #      neighbours in 4-connectivity)
+        # =====================================================================
+
+        # --- Build grass lookup set in terrain-grid coordinates ----------
+        grass_terrain_keys = set()   # (terrain_col, terrain_row)
+
+        if p.get('include_grass', True) and self.grass and terrain_grid_np is not None:
+            for grass_area in self.grass:
+                for cell in grass_area.get('cell_details', []):
+                    # Map the grass cell centre to the terrain grid
+                    cx = (cell['x_min'] + cell['x_max']) / 2.0
+                    cy = (cell['y_min'] + cell['y_max']) / 2.0
+                    tc = int((cx - terrain_x_min) / terrain_cell)
+                    tr = int((cy - terrain_y_min) / terrain_cell)
+                    tc = max(0, min(tc, terrain_cols - 2))
+                    tr = max(0, min(tr, terrain_rows - 2))
+                    grass_terrain_keys.add((tc, tr))
+
+            # (a) Remove isolated cells (must have ≥1 neighbour in 4-conn.)
+            filtered = set()
+            for (c, r) in grass_terrain_keys:
+                neighbours = 0
+                for dc, dr in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                    if (c + dc, r + dr) in grass_terrain_keys:
+                        neighbours += 1
+                if neighbours >= 1:
+                    filtered.add((c, r))
+            grass_terrain_keys = filtered
+
+            # (b) Fill small holes: if a non-grass cell has ≥3 grass
+            #     neighbours, fill it in.  Repeat twice for cascade fills.
+            for _ in range(2):
+                to_fill = set()
+                # Only check cells that are adjacent to existing grass
+                candidates = set()
+                for (c, r) in grass_terrain_keys:
+                    for dc, dr in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                        nb = (c + dc, r + dr)
+                        if nb not in grass_terrain_keys:
+                            if 0 <= nb[0] < terrain_cols - 1 and 0 <= nb[1] < terrain_rows - 1:
+                                candidates.add(nb)
+                for (c, r) in candidates:
+                    grass_n = 0
+                    for dc, dr in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                        if (c + dc, r + dr) in grass_terrain_keys:
+                            grass_n += 1
+                    if grass_n >= 3:
+                        to_fill.add((c, r))
+                grass_terrain_keys |= to_fill
+
+            QgsMessageLog.logMessage(
+                f"Grass terrain cells: {len(grass_terrain_keys)} (after isolate-removal + hole-fill)",
+                "MyFlamma", Qgis.Info
             )
+
+        # --- Build the terrain mesh ----------------------------------------
+        if p.get('include_ground', True):
+            if terrain_grid_np is not None and include_terrain:
+                QgsMessageLog.logMessage(
+                    f"Building terrain mesh: {terrain_cols}x{terrain_rows} vertices",
+                    "MyFlamma", Qgis.Info
+                )
+
+                # Create vertex grid (row, col) → vertex index (shared by both materials)
+                vert_indices = np.zeros((terrain_rows, terrain_cols), dtype=np.int32)
+
+                for r in range(terrain_rows):
+                    if self.isCanceled():
+                        return False
+                    for c in range(terrain_cols):
+                        lidar_x = terrain_x_min + c * terrain_cell
+                        lidar_y = terrain_y_min + r * terrain_cell
+
+                        obj_x = (lidar_x - origin_x) * scale
+                        obj_z = (origin_z - lidar_y) * scale  # flipped
+                        obj_y = (terrain_grid_np[r, c] - terrain_z_base) * scale
+
+                        vert_indices[r, c] = writer._vi(obj_x, obj_y, obj_z)
+
+                # We need two groups so we can start one, switch to the other,
+                # and keep adding faces.  Pre-create both groups.
+                writer.begin_group('Ground', 'mat_ground')
+                ground_group = writer._current_group
+                writer.begin_group('Grass', 'mat_grass')
+                grass_group = writer._current_group
+
+                n_up = writer._ni(0, 1, 0)
+                n_down = writer._ni(0, -1, 0)
+
+                for r in range(terrain_rows - 1):
+                    if self.isCanceled():
+                        return False
+                    for c in range(terrain_cols - 1):
+                        v00 = vert_indices[r, c]
+                        v10 = vert_indices[r + 1, c]
+                        v11 = vert_indices[r + 1, c + 1]
+                        v01 = vert_indices[r, c + 1]
+
+                        # Choose material: grass or ground
+                        if (c, r) in grass_terrain_keys:
+                            target = grass_group
+                        else:
+                            target = ground_group
+
+                        # Top face (CCW from above) – two triangles
+                        target['faces'].append([(v00, n_up), (v01, n_up), (v11, n_up)])
+                        target['faces'].append([(v00, n_up), (v11, n_up), (v10, n_up)])
+                        # Bottom face (reversed winding, visible from below)
+                        target['faces'].append([(v00, n_down), (v11, n_down), (v01, n_down)])
+                        target['faces'].append([(v00, n_down), (v10, n_down), (v11, n_down)])
+
+                # Remove grass group if it ended up empty
+                if not grass_group['faces']:
+                    writer.groups.remove(grass_group)
+                # Remove ground group if it ended up empty (unlikely)
+                if not ground_group['faces']:
+                    writer.groups.remove(ground_group)
+
+                QgsMessageLog.logMessage("Terrain mesh built (ground + grass painted).", "MyFlamma", Qgis.Info)
+            else:
+                # Flat ground plane fallback
+                writer.begin_group('Ground', 'mat_ground')
+                writer.add_quad(
+                    scene_x_min - padding, scene_z_min - padding,
+                    scene_x_max + padding, scene_z_max + padding,
+                    y=0.0
+                )
+
             progress_done += 1
             self.setProgress(int(progress_done / progress_total * 100))
 
@@ -283,55 +480,7 @@ class ObjExportTask(QgsTask):
             return False
 
         # =====================================================================
-        #  2. GRASS – flat squares slightly above ground
-        # =====================================================================
-        if p.get('include_grass', True) and self.grass:
-            writer.begin_group('Grass', 'mat_grass')
-            for grass_area in self.grass:
-                if self.isCanceled():
-                    return False
-
-                for cell in grass_area.get('cell_details', []):
-                    gx_min = (cell['x_min'] - origin_x) * scale
-                    gx_max = (cell['x_max'] - origin_x) * scale
-                    gz_min = (origin_z - cell['y_max']) * scale  # flipped
-                    gz_max = (origin_z - cell['y_min']) * scale  # flipped
-
-                    writer.add_quad(gx_min, gz_min, gx_max, gz_max, y=0.05 * scale)
-
-                progress_done += 1
-                if progress_done % 100 == 0:
-                    self.setProgress(int(progress_done / progress_total * 100))
-
-        if self.isCanceled():
-            return False
-
-        # =====================================================================
-        #  2b. ROADS – flat black squares slightly above ground (below grass)
-        # =====================================================================
-        if p.get('include_roads', True) and self.roads:
-            writer.begin_group('Roads', 'mat_road')
-            for road_area in self.roads:
-                if self.isCanceled():
-                    return False
-
-                for cell in road_area.get('cell_details', []):
-                    rx_min = (cell['x_min'] - origin_x) * scale
-                    rx_max = (cell['x_max'] - origin_x) * scale
-                    rz_min = (origin_z - cell['y_max']) * scale  # flipped
-                    rz_max = (origin_z - cell['y_min']) * scale  # flipped
-
-                    writer.add_quad(rx_min, rz_min, rx_max, rz_max, y=0.03 * scale)
-
-                progress_done += 1
-                if progress_done % 100 == 0:
-                    self.setProgress(int(progress_done / progress_total * 100))
-
-        if self.isCanceled():
-            return False
-
-        # =====================================================================
-        #  3. SHRUBS – small green cubes
+        #  2. SHRUBS – small green cubes at terrain elevation
         # =====================================================================
         if p.get('include_shrubs', True) and self.shrubs:
             writer.begin_group('Shrubs', 'mat_shrub')
@@ -341,6 +490,7 @@ class ObjExportTask(QgsTask):
 
                 sx = (shrub.get('x', 0) - origin_x) * scale
                 sz = (origin_z - shrub.get('y', 0)) * scale  # flipped
+                elev = get_terrain_elev(shrub.get('x', 0), shrub.get('y', 0))
                 # Limitar altura a máximo 2m para arbustos
                 s_height = min(max(shrub.get('height', 0.3), 0.2), 2.0) * scale
                 # Arbustos típicamente son 0.3-1.5m de diámetro
@@ -350,8 +500,8 @@ class ObjExportTask(QgsTask):
                 writer.add_box(
                     sx - half, sz - half,
                     sx + half, sz + half,
-                    y_base=0.0,
-                    y_top=s_height
+                    y_base=elev,
+                    y_top=elev + s_height
                 )
 
                 progress_done += 1
@@ -362,7 +512,7 @@ class ObjExportTask(QgsTask):
             return False
 
         # =====================================================================
-        #  4. TREES – rectangular trunk + cube crown
+        #  3. TREES – rectangular trunk + cube crown at terrain elevation
         # =====================================================================
         if p.get('include_trees', True) and self.trees:
             for tree in self.trees:
@@ -371,6 +521,7 @@ class ObjExportTask(QgsTask):
 
                 tx = (tree.get('x', 0) - origin_x) * scale
                 tz = (origin_z - tree.get('y', 0)) * scale  # flipped
+                elev = get_terrain_elev(tree.get('x', 0), tree.get('y', 0))
                 t_height = max(tree.get('height', 1.0), 1.0) * scale
                 t_crown_diam = max(tree.get('crown_diam', 0.5), 0.5) * scale
 
@@ -389,8 +540,8 @@ class ObjExportTask(QgsTask):
                 writer.add_box(
                     tx - trunk_half, tz - trunk_half,
                     tx + trunk_half, tz + trunk_half,
-                    y_base=0.0,
-                    y_top=trunk_top
+                    y_base=elev,
+                    y_top=elev + trunk_top
                 )
 
                 # Crown: cube at top
@@ -399,8 +550,8 @@ class ObjExportTask(QgsTask):
                 writer.add_box(
                     tx - crown_half, tz - crown_half,
                     tx + crown_half, tz + crown_half,
-                    y_base=trunk_top,
-                    y_top=t_height
+                    y_base=elev + trunk_top,
+                    y_top=elev + t_height
                 )
 
                 progress_done += 1
@@ -411,30 +562,32 @@ class ObjExportTask(QgsTask):
             return False
 
         # =====================================================================
-        #  5. BUILDINGS – extruded boxes per cell (grid squares)
+        #  4. BUILDINGS – extruded boxes at terrain elevation
         # =====================================================================
         if p.get('include_buildings', True) and self.buildings:
-            # Group by building ID
             for building in self.buildings:
                 if self.isCanceled():
                     return False
 
-                bid = building.get('x', 'x')  # use centroid as fallback ID
+                bid = building.get('x', 'x')
                 writer.begin_group(f'Building_walls', 'mat_building')
                 
                 for cell in building.get('cell_details', []):
+                    cx = (cell['x_min'] + cell['x_max']) / 2.0
+                    cy = (cell['y_min'] + cell['y_max']) / 2.0
+                    elev = get_terrain_elev(cx, cy)
+
                     bx_min = (cell['x_min'] - origin_x) * scale
                     bx_max = (cell['x_max'] - origin_x) * scale
                     bz_min = (origin_z - cell['y_max']) * scale  # flipped
                     bz_max = (origin_z - cell['y_min']) * scale  # flipped
-                    # Limitar altura edificios a máximo 50m realista
                     b_height = min(max(cell.get('height_max', 3), 1.0), 50.0) * scale
 
                     writer.add_box(
                         bx_min, bz_min,
                         bx_max, bz_max,
-                        y_base=0.0,
-                        y_top=b_height
+                        y_base=elev,
+                        y_top=elev + b_height
                     )
 
                 progress_done += 1
@@ -490,11 +643,8 @@ def export_to_obj(plugin_ref):
     from .obj_export_dialog import ObjExportDialog
     from .quick_classify import QuickClassifyTask
 
-    # Check if we have classification data
-    has_data = hasattr(plugin_ref, 'last_classification_data') and plugin_ref.last_classification_data is not None
-    
-    # Show dialog - request input file if no data
-    dlg = ObjExportDialog(plugin_ref.iface.mainWindow(), translator=plugin_ref.tr, require_input=not has_data, iface=plugin_ref.iface)
+    # Always show dialog with file selector
+    dlg = ObjExportDialog(plugin_ref.iface.mainWindow(), translator=plugin_ref.tr, require_input=True, iface=plugin_ref.iface)
 
     if dlg.exec_() != ObjExportDialog.Accepted:
         return
@@ -502,27 +652,38 @@ def export_to_obj(plugin_ref):
     input_file = dlg.get_input_file()
     params = dlg.get_params()
 
-    # If no existing data, run quick classify first
-    if not has_data:
-        if not input_file:
-            from qgis.PyQt.QtWidgets import QMessageBox
-            QMessageBox.warning(plugin_ref.iface.mainWindow(), plugin_ref.tr("Error"),
-                                plugin_ref.tr("Please select a LAS/LAZ file."))
-            return
+    if not input_file:
+        from qgis.PyQt.QtWidgets import QMessageBox
+        QMessageBox.warning(plugin_ref.iface.mainWindow(), plugin_ref.tr("Error"),
+                            plugin_ref.tr("Please select a LAS/LAZ file."))
+        return
 
-        # Launch quick classify task in background
+    # Normalize path for comparison
+    input_file_norm = os.path.normpath(input_file)
+
+    # Check if cached data matches the selected file
+    has_matching_data = (
+        hasattr(plugin_ref, 'last_classification_data')
+        and plugin_ref.last_classification_data is not None
+        and os.path.normpath(plugin_ref.last_classification_data.get('filename', '')) == input_file_norm
+    )
+
+    if has_matching_data:
+        # Cached data matches selected file, export directly
+        _do_obj_export(plugin_ref, params)
+    else:
+        # Different file or no cache: run quick classify first
         task_desc = f"Classifying {os.path.basename(input_file)} for OBJ export"
         task = QuickClassifyTask(task_desc, input_file, plugin_ref, plugin_ref.tr)
-        
+
         # Store callback to launch OBJ export after classification
         original_finished = task.finished
         def on_classify_done(result):
             original_finished(result)
             if result:
-                # Now proceed with OBJ export
                 _do_obj_export(plugin_ref, params)
         task.finished = on_classify_done
-        
+
         plugin_ref.running_tasks.append(task)
         QgsApplication.taskManager().addTask(task)
 
@@ -531,9 +692,6 @@ def export_to_obj(plugin_ref):
             plugin_ref.tr("Classifying LAS file for OBJ export..."),
             level=Qgis.Info, duration=-1
         )
-    else:
-        # Data already available, proceed directly
-        _do_obj_export(plugin_ref, params)
 
 
 def _do_obj_export(plugin_ref, params):
@@ -553,11 +711,11 @@ def _do_obj_export(plugin_ref, params):
         data.get('shrubs', []),
         data.get('grass', []),
         data.get('buildings', []),
-        data.get('roads', []),
         params,
         output_path,
         plugin_ref,
-        plugin_ref.tr
+        plugin_ref.tr,
+        terrain=data.get('terrain', None)
     )
     plugin_ref.running_tasks.append(task)
     QgsApplication.taskManager().addTask(task)

@@ -6,8 +6,10 @@ Dialog for OBJ Export tool - Input file + export options.
 import os
 from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGroupBox, QCheckBox, QDoubleSpinBox, QSpinBox, QLineEdit, QFileDialog, QMessageBox
+    QGroupBox, QCheckBox, QDoubleSpinBox, QSpinBox, QLineEdit, QFileDialog, QMessageBox,
+    QDialogButtonBox, QWidget, QSpacerItem, QSizePolicy, QTextBrowser
 )
+from qgis.PyQt.QtCore import Qt
 from qgis.core import QgsProject, QgsPointCloudLayer
 
 
@@ -15,25 +17,22 @@ class ObjExportDialog(QDialog):
     def __init__(self, parent=None, translator=None, require_input=False, iface=None):
         super().__init__(parent)
         self.tr_func = translator if translator else lambda x: x
-        self.require_input = require_input
+        self.require_input = True  # Always require input file selection
         self.iface = iface
         self.setWindowTitle(self.tr_func("Export to OBJ"))
-        self.setMinimumWidth(500)
+        self.resize(900, 600)
+        self.setMinimumWidth(850)
         self._setup_ui()
 
     def _setup_ui(self):
-        layout = QVBoxLayout()
+        main_layout = QHBoxLayout(self)
 
-        # --- Descripción ---
-        desc_text = (
-            "<b>Export to OBJ</b><br>"
-            "Generate a 3D OBJ file with trees, shrubs, grass, and buildings.<br>"
-            "The file will be saved in the project directory as <i>*_3d_scene.obj</i>"
-        )
-
-        desc = QLabel(desc_text)
-        desc.setWordWrap(True)
-        layout.addWidget(desc)
+        # --- Left Panel ---
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(8)
+        left_layout.setAlignment(Qt.AlignTop)
 
         # --- Input file (if needed) ---
         if self.require_input:
@@ -54,14 +53,14 @@ class ObjExportDialog(QDialog):
             
             file_row.addWidget(self.input_edit)
             
-            btn_browse = QPushButton("...")
+            btn_browse = QPushButton(self.tr_func("..."))
             btn_browse.setFixedWidth(40)
             btn_browse.clicked.connect(self._browse_input)
             file_row.addWidget(btn_browse)
             
             input_layout.addLayout(file_row)
             input_group.setLayout(input_layout)
-            layout.addWidget(input_group)
+            left_layout.addWidget(input_group)
 
         # --- Export Options ---
         opts_group = QGroupBox(self.tr_func("Elements to Include"))
@@ -87,12 +86,13 @@ class ObjExportDialog(QDialog):
         self.check_buildings.setChecked(True)
         opts_layout.addWidget(self.check_buildings)
 
-        self.check_roads = QCheckBox(self.tr_func("Include roads (flat planes)"))
-        self.check_roads.setChecked(True)
-        opts_layout.addWidget(self.check_roads)
+        self.check_terrain = QCheckBox(self.tr_func("Include terrain elevation"))
+        self.check_terrain.setChecked(True)
+        self.check_terrain.setToolTip(self.tr_func("Generate 3D terrain mesh from ground elevation data (mountains, hills, slopes)"))
+        opts_layout.addWidget(self.check_terrain)
 
         opts_group.setLayout(opts_layout)
-        layout.addWidget(opts_group)
+        left_layout.addWidget(opts_group)
 
         # --- Export Configuration ---
         config_group = QGroupBox(self.tr_func("Export Configuration"))
@@ -121,21 +121,64 @@ class ObjExportDialog(QDialog):
         config_layout.addLayout(padding_row)
 
         config_group.setLayout(config_layout)
-        layout.addWidget(config_group)
+        left_layout.addWidget(config_group)
 
-        # --- Buttons ---
-        btn_layout = QHBoxLayout()
-        btn_export = QPushButton(self.tr_func("Export"))
-        btn_export.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 8px;")
-        btn_export.clicked.connect(self._validate_and_accept)
-        btn_layout.addWidget(btn_export)
+        left_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
-        btn_cancel = QPushButton(self.tr_func("Cancel"))
-        btn_cancel.clicked.connect(self.reject)
-        btn_layout.addWidget(btn_cancel)
+        # --- OK / Cancel buttons ---
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self._validate_and_accept)
+        buttons.rejected.connect(self.reject)
+        left_layout.addWidget(buttons)
 
-        layout.addLayout(btn_layout)
-        self.setLayout(layout)
+        # --- Right Panel (Description) ---
+        desc_box = QTextBrowser()
+        desc_box.setOpenExternalLinks(False)
+        desc_box.setFixedWidth(320)
+        desc_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        desc_box.setStyleSheet("""
+            QTextBrowser {
+                background-color: #fafafa;
+                border: 1px solid #dcdcdc;
+                padding: 10px;
+                border-radius: 6px;
+                font-family: "Segoe UI", sans-serif;
+                font-size: 10pt;
+            }
+        """)
+
+        title = self.tr_func("OBJ 3D Export")
+        intro = self.tr_func(
+            "This tool generates a 3D OBJ file from classified LiDAR data, including trees, shrubs, grass, and buildings with real terrain elevation."
+        )
+        workflow = self.tr_func("Workflow:")
+        step1 = self.tr_func("Reads classified data from memory or runs a quick classification on the input LAS/LAZ file.")
+        step2 = self.tr_func("Generates 3D geometry for each element type: trunks and crowns for trees, cubes for shrubs, inclined quads for grass, extruded boxes for buildings, and a terrain mesh with real elevation data.")
+        step3 = self.tr_func("Creates an OBJ file with materials (MTL) ready for import into Unity, Blender, or other 3D tools.")
+        note = self.tr_func(
+            "The output file will be saved as *_3d_scene.obj alongside the input file. "
+            "A matching .mtl material file is generated automatically. "
+            "Coordinate system uses Y-up convention (compatible with Unity)."
+        )
+
+        desc_html = f"""
+            <div style="position: relative;">
+                <h3 style="margin-bottom:4px;">{title}</h3>
+                <p style="font-size:9.5pt; color:#444;">{intro}</p>
+                <hr style="border:none; border-top:1px solid #ccc; margin:6px 0;">
+                <h4 style="margin-bottom:2px;">{workflow}</h4>
+                <ul>
+                    <li>{step1}</li>
+                    <li>{step2}</li>
+                    <li>{step3}</li>
+                </ul>
+                <p style="margin-top:4px; font-size:9pt; color:#666;">{note}</p>
+            </div>
+        """
+        desc_box.setHtml(desc_html)
+
+        main_layout.addWidget(left_panel, stretch=3)
+        main_layout.addWidget(desc_box, stretch=2)
 
     def _get_point_cloud_layers(self):
         """Get list of (layer_name, layer_path) for point cloud layers in project."""
@@ -177,10 +220,8 @@ class ObjExportDialog(QDialog):
         self.accept()
 
     def get_input_file(self):
-        """Return input file path if required, else None."""
-        if self.require_input:
-            return self.input_edit.text().strip()
-        return None
+        """Return input file path."""
+        return self.input_edit.text().strip()
 
     def get_params(self):
         """Return all dialog parameters as a dictionary."""
@@ -190,7 +231,7 @@ class ObjExportDialog(QDialog):
             'include_shrubs': self.check_shrubs.isChecked(),
             'include_grass': self.check_grass.isChecked(),
             'include_buildings': self.check_buildings.isChecked(),
-            'include_roads': self.check_roads.isChecked(),
+            'include_terrain': self.check_terrain.isChecked(),
             'scale': self.scale_spin.value(),
             'ground_padding': self.padding_spin.value(),
         }

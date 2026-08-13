@@ -478,7 +478,7 @@ class VegetationClassificationCHMTask(QgsTask):
                         if len(low_veg_indices_in_filtered) > 0:
                             # Aplicar clustering SUAVE a clase 3 para agrupar en áreas
                             xy_low_veg = np.column_stack((grass_x_filt[low_veg_indices_in_filtered], grass_y_filt[low_veg_indices_in_filtered]))
-                            clustering_low_veg = DBSCAN(eps=5.0, min_samples=1).fit(xy_low_veg)  # min_samples=1 para incluir todo
+                            clustering_low_veg = DBSCAN(eps=5.0, min_samples=5).fit(xy_low_veg)  # min_samples=5 para filtrar ruido
                             labels_low_veg = clustering_low_veg.labels_
                             unique_labels_low_veg = set(labels_low_veg)
                             
@@ -490,7 +490,7 @@ class VegetationClassificationCHMTask(QgsTask):
                                 cluster_local_indices = np.where(cluster_mask)[0]
                                 cluster_indices = low_veg_indices_in_filtered[cluster_local_indices]
                                 
-                                if len(cluster_indices) >= 1:  # Al menos 1 punto
+                                if len(cluster_indices) >= 5:  # Al menos 5 puntos para filtrar ruido
                                     self._create_grass_polygon(cluster_indices, grass_x_filt, grass_y_filt, 
                                                                grass_r_filt, grass_g_filt, grass_b_filt, 
                                                                build_tree, grass_detected)
@@ -678,14 +678,17 @@ class VegetationClassificationCHMTask(QgsTask):
                         
                         # Extraer coordenadas del polígono unificado
                         if simplified_geom.geom_type == 'Polygon':
+                            # Un solo polígono
                             coords = list(simplified_geom.exterior.coords)
                             final_polygons = [coords]
                         elif simplified_geom.geom_type == 'MultiPolygon':
+                            # Múltiples polígonos (si hay huecos o islas)
                             final_polygons = []
                             for poly in simplified_geom.geoms:
                                 coords = list(poly.exterior.coords)
                                 final_polygons.append(coords)
                         else:
+                            # Fallback si es algo inesperado
                             final_polygons = []
                         
                         if final_polygons:
@@ -769,7 +772,7 @@ class VegetationClassificationCHMTask(QgsTask):
 
     def _create_grass_polygon(self, cluster_indices, grass_x, grass_y, grass_r, grass_g, grass_b, build_tree, grass_detected):
         """Crea polígono de grass desde índices de cluster - UNIFICA celdas en forma continua"""
-        if len(cluster_indices) < 1:
+        if len(cluster_indices) < 5:
             return
         
         from shapely.geometry import Polygon, MultiPolygon
@@ -813,12 +816,43 @@ class VegetationClassificationCHMTask(QgsTask):
                     grid_dict[key] = []
                 grid_dict[key].append(i)
             
+            # --- Filter: min 5 points per cell ---
+            valid_keys = {k for k, v in grid_dict.items() if len(v) >= 5}
+
+            # --- (a) Remove isolated cells (no 4-connected neighbour) ---
+            connected_keys = set()
+            for key in valid_keys:
+                c, r = key
+                for dc, dr in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                    if (c + dc, r + dr) in valid_keys:
+                        connected_keys.add(key)
+                        break
+
+            # --- (b) Fill small holes (non-grass cell with >=3 grass neighbours) ---
+            for _ in range(2):
+                to_fill = set()
+                candidates = set()
+                for key in connected_keys:
+                    c, r = key
+                    for dc, dr in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                        nb = (c + dc, r + dr)
+                        if nb not in connected_keys:
+                            candidates.add(nb)
+                for (c, r) in candidates:
+                    grass_n = sum(1 for dc, dr in [(1,0),(-1,0),(0,1),(0,-1)]
+                                  if (c+dc, r+dr) in connected_keys)
+                    if grass_n >= 3:
+                        to_fill.add((c, r))
+                connected_keys |= to_fill
+
             # Crear polígonos Shapely para CADA CELDA
             cell_polygons_shapely = []
             cell_details = []  # Guardar detalles de cada celda
-            num_cells = len(grid_dict)
+            num_cells = len(connected_keys)
             
-            for (col, row), point_indices in grid_dict.items():
+            for key in connected_keys:
+                col, row = key
+                point_indices = grid_dict.get(key, [])
                 # Crear cuadrado de la celda
                 cell_x_min = grid_min_x + col * grid_size
                 cell_x_max = cell_x_min + grid_size
@@ -835,11 +869,16 @@ class VegetationClassificationCHMTask(QgsTask):
                 cell_polygons_shapely.append(cell_poly)
                 
                 # Guardar detalles de esta celda
-                cell_point_indices = point_indices
-                cell_color_r = int(np.mean(clust_r[cell_point_indices]))
-                cell_color_g = int(np.mean(clust_g[cell_point_indices]))
-                cell_color_b = int(np.mean(clust_b[cell_point_indices]))
-                cell_density = len(cell_point_indices) / (grid_size ** 2)  # puntos/m²
+                if len(point_indices) > 0:
+                    cell_color_r = int(np.mean(clust_r[point_indices]))
+                    cell_color_g = int(np.mean(clust_g[point_indices]))
+                    cell_color_b = int(np.mean(clust_b[point_indices]))
+                else:
+                    # Filled hole cell: use cluster average color
+                    cell_color_r = int(np.mean(clust_r))
+                    cell_color_g = int(np.mean(clust_g))
+                    cell_color_b = int(np.mean(clust_b))
+                cell_density = len(point_indices) / (grid_size ** 2)
                 
                 cell_details.append({
                     'x_min': cell_x_min,
@@ -848,7 +887,7 @@ class VegetationClassificationCHMTask(QgsTask):
                     'y_max': cell_y_max,
                     'size_m2': grid_size ** 2,
                     'color_rgb': f"{cell_color_r},{cell_color_g},{cell_color_b}",
-                    'point_count': len(cell_point_indices),
+                    'point_count': max(len(point_indices), 1),
                     'density_pts_m2': cell_density
                 })
             
@@ -1282,7 +1321,7 @@ def classify_vegetation(self):
 
     input_filename, output_filename = dialog.get_input_output()
     if not input_filename:
-        QMessageBox.warning(self.iface.mainWindow(), "Alert", "Select input file.")
+        QMessageBox.warning(self.iface.mainWindow(), self.tr("Alert"), self.tr("Select input file."))
         return
 
     # 2. Obtener parámetros

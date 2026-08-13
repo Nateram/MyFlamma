@@ -24,8 +24,13 @@ class MyFlammaPlugin:
         self.last_classification_data = None  # Para export OBJ
 
         self.translations = {}
-        system_lang = QLocale.system().name()[:2] # Detect system language ("en", "es")
-        self.current_lang = system_lang if system_lang else "en"
+        supported_languages = ["en", "es"]
+        system_lang = QLocale.system().name()[:2]  # Detect system language (e.g., "en", "es")
+        self.current_lang = system_lang if system_lang in supported_languages else "en"
+        if self.current_lang not in supported_languages:
+            QgsApplication.messageLog().logMessage(
+                f"Unsupported language '{system_lang}' detected. Falling back to English.", "MyFlamma", Qgis.Warning
+            )
         self.load_language(self.current_lang)
 
         self.ignition_points = []
@@ -45,7 +50,7 @@ class MyFlammaPlugin:
 
     def initGui(self):
         main_win = self.iface.mainWindow()
-        self.menu = QMenu("MyFlamma", main_win)
+        self.menu = QMenu(self.tr("MyFlamma"), main_win)
 
         menubar = main_win.menuBar()
         help_menu = None
@@ -62,13 +67,13 @@ class MyFlammaPlugin:
         actions = [
             ("vegetation.png", self.tr("Classify Data"), self.vegetation_classification_chm),
             ("fire.png", self.tr("Export to FlamMap"), self.export_flammap),
-            ("vegetation.png", self.tr("Export to OBJ"), self.export_obj),
+            ("obj.png", self.tr("Export to OBJ"), self.export_obj),
         ]
 
         self.actions = []
         for icon_file, label, callback in actions:
             icon_path = os.path.join(self.plugin_dir, 'icons', icon_file)
-            action = QAction(QIcon(icon_path), self.tr(label), main_win)
+            action = QAction(QIcon(icon_path), label, main_win)
             action.triggered.connect(callback)
             self.menu.addAction(action)
             self.actions.append(action)

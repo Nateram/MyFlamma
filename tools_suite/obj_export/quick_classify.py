@@ -45,7 +45,7 @@ class QuickClassifyTask(QgsTask):
                 green = np.array(las.green, dtype=np.uint8)
                 blue = np.array(las.blue, dtype=np.uint8)
 
-            QgsMessageLog.logMessage(f"Classify: Read {len(x)} points from {os.path.basename(self.filename)}", "MyFlamma", Qgis.Info)
+            QgsMessageLog.logMessage(self.tr(f"Classify: Read {len(x)} points from {os.path.basename(self.filename)}"), "MyFlamma", Qgis.Info)
             self.setProgress(10)
 
             if self.isCanceled():
@@ -201,10 +201,8 @@ class QuickClassifyTask(QgsTask):
                     rd_pts = np.column_stack((gx_rd[road_pt_idx], gy_rd[road_pt_idx]))
                     road_tree_2d = cKDTree(rd_pts)
 
-            QgsMessageLog.logMessage(
-                f"Roads auto-detected: {len(roads_detected)} areas, {len(road_cell_keys)} cells",
-                "MyFlamma", Qgis.Info
-            )
+            QgsMessageLog.logMessage(self.tr(f"Roads auto-detected: {len(roads_detected)} areas, {len(road_cell_keys)} cells"),
+                "MyFlamma", Qgis.Info)
 
             # --- TREES (Class 3+5 - Vegetation, filtered by height) ---
             trees_detected = []
@@ -461,36 +459,38 @@ class QuickClassifyTask(QgsTask):
             if self.isCanceled():
                 return False
 
-            # --- GRASS (Class 2/3) ---
+            # --- RECLASSIFICATION: Class 2 → Class 3 (same as reclassified LAZ) ---
+            # This replicates the exact same logic the reclassified LAZ uses,
+            # so the OBJ matches it even without generating the reclassified file.
+            if has_color:
+                reclass_mask = classification == 2
+                if np.sum(reclass_mask) > 0:
+                    rc_r = red[reclass_mask]
+                    rc_g = green[reclass_mask]
+                    rc_b = blue[reclass_mask]
+                    rc_exg = (2 * rc_g.astype(np.float32)) - rc_r.astype(np.float32) - rc_b.astype(np.float32)
+                    rc_green_mask = (rc_exg > 12) & (rc_g > rc_r) & (rc_g > rc_b)
+                    # Reclassify matching points: Class 2 → Class 3
+                    reclass_indices = np.where(reclass_mask)[0]
+                    classification[reclass_indices[rc_green_mask]] = 3
+                    n_reclassified = int(np.sum(rc_green_mask))
+                    QgsMessageLog.logMessage(
+                        f"Reclassified {n_reclassified} ground points (Class 2→3) for grass",
+                        "MyFlamma", Qgis.Info)
+
+            # --- GRASS (Class 3 — original + reclassified) ---
             grass_detected = []
-            grass_mask_2 = classification == 2
-            grass_mask_3 = classification == 3
-            combined_grass_mask = grass_mask_2 | grass_mask_3
+            grass_mask_all = classification == 3  # Now includes reclassified pts
             
-            # Detectar pasto: Clase 3 SIEMPRE + Clase 2 con ExG > 12
-            if np.sum(combined_grass_mask) > 50 and has_color:
+            if np.sum(grass_mask_all) > 50 and has_color:
                 self.setProgress(70)
-                gx = x[combined_grass_mask]
-                gy = y[combined_grass_mask]
-                gr = red[combined_grass_mask]
-                gg = green[combined_grass_mask]
-                gb = blue[combined_grass_mask]
-                grass_class = classification[combined_grass_mask]
-                
-                # ExG filter
-                exg = (2 * gg.astype(np.float32)) - gr.astype(np.float32) - gb.astype(np.float32)
-                
-                # Máscara: (Clase 3 SIEMPRE) O (Clase 2 con ExG > 12)
-                is_low_veg = grass_class == 3  # Clase 3 existentes - SIEMPRE
-                is_grass_by_color = (grass_class == 2) & (exg > 12) & (gg > gr) & (gg > gb)  # Clase 2 con ExG
-                valid_grass = is_low_veg | is_grass_by_color
-                
-                if np.sum(valid_grass) > 0:
-                    gx_f = gx[valid_grass]
-                    gy_f = gy[valid_grass]
-                    gr_f = gr[valid_grass]
-                    gg_f = gg[valid_grass]
-                    gb_f = gb[valid_grass]
+                gx_f = x[grass_mask_all]
+                gy_f = y[grass_mask_all]
+                gr_f = red[grass_mask_all]
+                gg_f = green[grass_mask_all]
+                gb_f = blue[grass_mask_all]
+
+                if len(gx_f) > 0:
 
                     grid_size = 2.0
                     grid = {}
@@ -503,7 +503,41 @@ class QuickClassifyTask(QgsTask):
                         grid[key].append(i)
 
                     cell_details = []
-                    for key, indices in grid.items():
+                    # Minimum 5 points per cell to count as grass
+                    MIN_PTS_GRASS = 5
+                    all_keys = {k for k, v in grid.items() if len(v) >= MIN_PTS_GRASS}
+
+                    # (a) Remove isolated cells (no 4-connected neighbour)
+                    connected_keys = set()
+                    for key in all_keys:
+                        c, r = key
+                        for dc, dr in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                            if (c + dc, r + dr) in all_keys:
+                                connected_keys.add(key)
+                                break
+
+                    # (b) Fill small holes: non-grass cell with >=3 grass neighbours
+                    filled_keys = set()
+                    for _ in range(2):
+                        to_fill = set()
+                        candidates = set()
+                        for key in connected_keys:
+                            c, r = key
+                            for dc, dr in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+                                nb = (c + dc, r + dr)
+                                if nb not in connected_keys:
+                                    candidates.add(nb)
+                        for (c, r) in candidates:
+                            grass_n = sum(1 for dc, dr in [(1,0),(-1,0),(0,1),(0,-1)]
+                                          if (c+dc, r+dr) in connected_keys)
+                            if grass_n >= 3:
+                                to_fill.add((c, r))
+                                grid.setdefault((c, r), [])
+                        connected_keys |= to_fill
+                        filled_keys |= to_fill
+
+                    for key in connected_keys:
+                        indices = grid.get(key, [])
                         # Skip grass cells that overlap with road cells
                         if key in road_cell_keys:
                             continue
@@ -519,8 +553,9 @@ class QuickClassifyTask(QgsTask):
                             'x_max': float(x_max),
                             'y_max': float(y_max),
                             'size_m2': grid_size ** 2,
-                            'color_rgb': f"{int(np.mean(gr_f[indices]))},{int(np.mean(gg_f[indices]))},{int(np.mean(gb_f[indices]))}",
-                            'point_count': len(indices),
+                            'color_rgb': (f"{int(np.mean(gr_f[indices]))},{int(np.mean(gg_f[indices]))},{int(np.mean(gb_f[indices]))}"
+                                          if len(indices) > 0 else f"{int(np.mean(gr_f))},{int(np.mean(gg_f))},{int(np.mean(gb_f))}"),
+                            'point_count': max(len(indices), 1),
                             'density_pts_m2': len(indices) / (grid_size ** 2)
                         })
 
@@ -634,6 +669,76 @@ class QuickClassifyTask(QgsTask):
                         })
 
             QgsMessageLog.logMessage(f"Buildings detected: {len(buildings_detected)}", "MyFlamma", Qgis.Info)
+            self.setProgress(90)
+
+            # --- TERRAIN DEM GRID (from ground points, class 2) ---
+            terrain_grid = None
+            if len(ground_xyz) > 50:
+                QgsMessageLog.logMessage("Generating terrain DEM grid for OBJ export...", "MyFlamma", Qgis.Info)
+                terrain_cell = 2.0  # 2m resolution grid
+
+                gx_t = ground_xyz[:, 0]
+                gy_t = ground_xyz[:, 1]
+                gz_t = ground_xyz[:, 2]
+
+                t_x_min = float(np.min(gx_t))
+                t_x_max = float(np.max(gx_t))
+                t_y_min = float(np.min(gy_t))
+                t_y_max = float(np.max(gy_t))
+
+                t_cols = int(np.ceil((t_x_max - t_x_min) / terrain_cell)) + 1
+                t_rows = int(np.ceil((t_y_max - t_y_min) / terrain_cell)) + 1
+
+                # Limit grid size to avoid memory issues (max ~2000x2000)
+                if t_cols > 2000 or t_rows > 2000:
+                    terrain_cell = max((t_x_max - t_x_min) / 2000, (t_y_max - t_y_min) / 2000, terrain_cell)
+                    t_cols = int(np.ceil((t_x_max - t_x_min) / terrain_cell)) + 1
+                    t_rows = int(np.ceil((t_y_max - t_y_min) / terrain_cell)) + 1
+
+                # Grid: accumulate heights per cell (use mean Z)
+                z_sum = np.zeros((t_rows, t_cols), dtype=np.float64)
+                z_count = np.zeros((t_rows, t_cols), dtype=np.int32)
+
+                col_idx = np.clip(((gx_t - t_x_min) / terrain_cell).astype(int), 0, t_cols - 1)
+                row_idx = np.clip(((gy_t - t_y_min) / terrain_cell).astype(int), 0, t_rows - 1)
+
+                for i in range(len(gx_t)):
+                    c, r = col_idx[i], row_idx[i]
+                    z_sum[r, c] += gz_t[i]
+                    z_count[r, c] += 1
+
+                # Mean height where we have data
+                valid = z_count > 0
+                z_mean = np.zeros_like(z_sum)
+                z_mean[valid] = z_sum[valid] / z_count[valid]
+
+                # Fill holes (cells with no ground points) using nearest valid cell
+                if np.sum(~valid) > 0 and np.sum(valid) > 0:
+                    from scipy.ndimage import distance_transform_edt
+                    # distance_transform_edt with indices gives us the nearest valid cell
+                    _, nearest_idx = distance_transform_edt(~valid, return_distances=True, return_indices=True)
+                    z_mean = z_mean[nearest_idx[0], nearest_idx[1]]
+
+                # Store the minimum elevation to normalize later
+                z_base = float(np.min(z_mean[valid])) if np.sum(valid) > 0 else 0.0
+
+                terrain_grid = {
+                    'x_min': t_x_min,
+                    'x_max': t_x_max,
+                    'y_min': t_y_min,
+                    'y_max': t_y_max,
+                    'cell_size': terrain_cell,
+                    'cols': t_cols,
+                    'rows': t_rows,
+                    'z_grid': z_mean.tolist(),  # 2D list of elevations
+                    'z_base': z_base,           # minimum elevation for normalization
+                }
+                QgsMessageLog.logMessage(
+                    f"Terrain DEM: {t_cols}x{t_rows} cells, cell={terrain_cell:.1f}m, "
+                    f"Z range: {z_base:.1f} - {float(np.max(z_mean)):.1f}m",
+                    "MyFlamma", Qgis.Info
+                )
+
             self.setProgress(95)
 
             # --- SAVE TO PLUGIN ---
@@ -643,7 +748,8 @@ class QuickClassifyTask(QgsTask):
                 'shrubs': shrubs_detected,
                 'grass': grass_detected,
                 'buildings': buildings_detected,
-                'roads': roads_detected
+                'roads': roads_detected,
+                'terrain': terrain_grid
             }
 
             self.setProgress(100)

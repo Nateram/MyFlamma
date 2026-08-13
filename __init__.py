@@ -27,11 +27,10 @@ def ensure_dependencies():
                 subprocess.check_call([python_exe, "-m", "pip", "install", pip_name])
             except Exception as e:
                 from qgis.PyQt.QtWidgets import QMessageBox
-                QMessageBox.critical(None, "Dependency installation failed",
-                    f"Failed to install {pip_name}\n\nError: {e}")
+                QMessageBox.critical(None, self.tr("Dependency installation failed"), self.tr("Please check your internet connection and try again."))
                 raise
 
 def classFactory(iface):
     ensure_dependencies()
-    from .my_lidar import MyFlammaPlugin
+    from .myFlamma import MyFlammaPlugin
     return MyFlammaPlugin(iface)
