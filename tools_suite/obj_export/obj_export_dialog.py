@@ -6,8 +6,9 @@ Dialog for OBJ Export tool - Input file + export options.
 import os
 from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGroupBox, QCheckBox, QDoubleSpinBox, QSpinBox, QLineEdit, QFileDialog, QMessageBox,
-    QDialogButtonBox, QWidget, QSpacerItem, QSizePolicy, QTextBrowser
+    QGroupBox, QCheckBox, QDoubleSpinBox, QSpinBox, QLineEdit,
+    QFileDialog, QMessageBox, QDialogButtonBox, QWidget, QSpacerItem,
+    QSizePolicy, QTextBrowser
 )
 from qgis.PyQt.QtCore import Qt
 from qgis.core import QgsProject, QgsPointCloudLayer
@@ -19,8 +20,11 @@ class ObjExportDialog(QDialog):
         self.tr_func = translator if translator else lambda x: x
         self.require_input = True  # Always require input file selection
         self.iface = iface
+        self.selected_output = None
+        self.user_edited_output = False
+        self._updating_output = False
         self.setWindowTitle(self.tr_func("Export to OBJ"))
-        self.resize(900, 600)
+        self.resize(900, 570)
         self.setMinimumWidth(850)
         self._setup_ui()
 
@@ -34,33 +38,53 @@ class ObjExportDialog(QDialog):
         left_layout.setSpacing(8)
         left_layout.setAlignment(Qt.AlignTop)
 
-        # --- Input file (if needed) ---
+        # --- Input file ---
         if self.require_input:
             input_group = QGroupBox(self.tr_func("Input LAS/LAZ File"))
             input_layout = QVBoxLayout()
-            
+
             # File selector
             file_row = QHBoxLayout()
             file_row.addWidget(QLabel(self.tr_func("Selected file:")))
-            
+
             self.input_edit = QLineEdit()
             self.input_edit.setPlaceholderText(self.tr_func("Browse for LAS/LAZ file..."))
-            
+
             # Pre-fill with last imported layer if available
             last_layer_path = self._get_last_point_cloud_layer()
             if last_layer_path:
                 self.input_edit.setText(last_layer_path)
-            
+
             file_row.addWidget(self.input_edit)
-            
+
             btn_browse = QPushButton(self.tr_func("..."))
-            btn_browse.setFixedWidth(40)
+            btn_browse.setFixedWidth(28)
             btn_browse.clicked.connect(self._browse_input)
             file_row.addWidget(btn_browse)
-            
+
             input_layout.addLayout(file_row)
             input_group.setLayout(input_layout)
             left_layout.addWidget(input_group)
+
+        # --- Output file ---
+        left_layout.addWidget(QLabel(self.tr_func("Output OBJ File")))
+        output_layout = QHBoxLayout()
+
+        self.output_edit = QLineEdit()
+        self.output_edit.setPlaceholderText(self.tr_func("Select output OBJ file..."))
+        self.output_edit.textChanged.connect(self._on_output_text_changed)
+        output_layout.addWidget(self.output_edit)
+
+        btn_output = QPushButton(self.tr_func("..."))
+        btn_output.setFixedWidth(28)
+        btn_output.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        btn_output.clicked.connect(self._browse_output)
+        output_layout.addWidget(btn_output)
+
+        left_layout.addLayout(output_layout)
+
+        if self.get_input_file():
+            self._update_default_output()
 
         # --- Export Options ---
         opts_group = QGroupBox(self.tr_func("Elements to Include"))
@@ -156,9 +180,7 @@ class ObjExportDialog(QDialog):
         step2 = self.tr_func("Generates 3D geometry for each element type: trunks and crowns for trees, cubes for shrubs, inclined quads for grass, extruded boxes for buildings, and a terrain mesh with real elevation data.")
         step3 = self.tr_func("Creates an OBJ file with materials (MTL) ready for import into Unity, Blender, or other 3D tools.")
         note = self.tr_func(
-            "The output file will be saved as *_3d_scene.obj alongside the input file. "
-            "A matching .mtl material file is generated automatically. "
-            "Coordinate system uses Y-up convention (compatible with Unity)."
+            "The output file will be saved as *_3d_scene.obj alongside the input file. A matching .mtl material file is generated automatically. Coordinate system uses Y-up convention (compatible with Unity)."
         )
 
         desc_html = f"""
@@ -205,11 +227,55 @@ class ObjExportDialog(QDialog):
 
     def _browse_input(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, self.tr_func("Select LAS/LAZ File"), "",
-            "LAS/LAZ Files (*.las *.laz);;All Files (*)"
+            self, self.tr_func("Select LiDAR File"), "",
+            self.tr_func("LiDAR Files (*.las *.laz)")
         )
         if path:
             self.input_edit.setText(path)
+            self.user_edited_output = False
+            self._update_default_output()
+
+    def _browse_output(self):
+        default_dir = os.path.dirname(self.get_input_file()) or ""
+        default_name = self._default_output_name()
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            self.tr_func("Save OBJ File"),
+            os.path.join(default_dir, default_name),
+            self.tr_func("OBJ Files (*.obj)")
+        )
+        if path:
+            if not path.lower().endswith('.obj'):
+                path += '.obj'
+            self._updating_output = True
+            self.output_edit.setText(path)
+            self._updating_output = False
+            self.selected_output = path
+            self.user_edited_output = True
+
+    def _default_output_name(self):
+        input_file = self.get_input_file()
+        if not input_file:
+            return "scene_3d.obj"
+        return os.path.splitext(os.path.basename(input_file))[0] + "_3d_scene.obj"
+
+    def _update_default_output(self):
+        if self.user_edited_output:
+            return
+        default_output = self._default_output_name()
+        input_dir = os.path.dirname(self.get_input_file()) or ""
+        full_path = os.path.join(input_dir, default_output) if input_dir else default_output
+        self._updating_output = True
+        self.output_edit.setText(full_path)
+        self._updating_output = False
+        self.selected_output = full_path
+
+    def _on_output_text_changed(self, text):
+        if self._updating_output:
+            return
+        self.selected_output = text.strip()
+        if text.strip():
+            self.user_edited_output = True
 
     def _validate_and_accept(self):
         input_file = self.get_input_file()
@@ -217,15 +283,30 @@ class ObjExportDialog(QDialog):
             QMessageBox.warning(self, self.tr_func("No Input"),
                                 self.tr_func("Please select a LAS/LAZ file or use an imported layer."))
             return
+        output_file = self.get_output_file()
+        if not output_file:
+            QMessageBox.warning(self, self.tr_func("No Output"),
+                                self.tr_func("Please choose an output OBJ file."))
+            return
         self.accept()
 
     def get_input_file(self):
         """Return input file path."""
         return self.input_edit.text().strip()
 
+    def get_output_file(self):
+        """Return output OBJ file path, ensuring a .obj extension."""
+        path = self.output_edit.text().strip()
+        if not path:
+            return ""
+        if not path.lower().endswith('.obj'):
+            path += '.obj'
+        return path
+
     def get_params(self):
         """Return all dialog parameters as a dictionary."""
         return {
+            'output_obj': self.get_output_file(),
             'include_ground': self.check_ground.isChecked(),
             'include_trees': self.check_trees.isChecked(),
             'include_shrubs': self.check_shrubs.isChecked(),

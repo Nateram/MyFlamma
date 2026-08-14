@@ -5,18 +5,17 @@ OBJ Export - Generates a 3D .obj + .mtl from in-memory classified data.
 Geometry conventions (Y-up for Unity):
   - LiDAR X → OBJ X
   - LiDAR Y → OBJ Z  (depth)
-  - Height   → OBJ Y  (up)
+  - Height  → OBJ Y  (up)
 
 Shapes:
-  Ground   – triangulated terrain mesh with real elevation (double-sided)
-  Grass    – terrain faces painted green (same mesh, different material)
-  Shrubs   – cubes (width = crown_diam, height = Height_m)
-  Trees    – rectangular trunk + cube crown
-  Buildings – extruded boxes per cell (width from cell bounds, height from Height_Max_m)
+  Ground   - triangulated terrain mesh with real elevation (double-sided)
+  Grass    - terrain faces painted green (same mesh, different material)
+  Shrubs   - cubes (width = crown_diam, height = Height_m)
+  Trees    - rectangular trunk + cube crown
+  Buildings - extruded boxes per cell (width from cell bounds, height from Height_Max_m)
 """
 
 import os
-from collections import defaultdict
 
 from qgis.core import QgsTask, QgsApplication, QgsMessageLog, Qgis
 
@@ -32,7 +31,7 @@ class ObjWriter:
         self.vertices = []      # (x, y, z)
         self.normals = []       # (nx, ny, nz)
         self.groups = []        # (group_name, material_name, faces[])
-        # faces: list of tuples of (v_idx, vn_idx) – 1-based
+        # faces: list of tuples of (v_idx, vn_idx) - 1-based
         self._current_group = None
 
     # --- low-level helpers ---
@@ -449,7 +448,7 @@ class ObjExportTask(QgsTask):
                         else:
                             target = ground_group
 
-                        # Top face (CCW from above) – two triangles
+                        # Top face (CCW from above) - two triangles
                         target['faces'].append([(v00, n_up), (v01, n_up), (v11, n_up)])
                         target['faces'].append([(v00, n_up), (v11, n_up), (v10, n_up)])
                         # Bottom face (reversed winding, visible from below)
@@ -480,7 +479,7 @@ class ObjExportTask(QgsTask):
             return False
 
         # =====================================================================
-        #  2. SHRUBS – small green cubes at terrain elevation
+        #  2. SHRUBS - small green cubes at terrain elevation
         # =====================================================================
         if p.get('include_shrubs', True) and self.shrubs:
             writer.begin_group('Shrubs', 'mat_shrub')
@@ -512,7 +511,7 @@ class ObjExportTask(QgsTask):
             return False
 
         # =====================================================================
-        #  3. TREES – rectangular trunk + cube crown at terrain elevation
+        #  3. TREES - rectangular trunk + cube crown at terrain elevation
         # =====================================================================
         if p.get('include_trees', True) and self.trees:
             for tree in self.trees:
@@ -562,7 +561,7 @@ class ObjExportTask(QgsTask):
             return False
 
         # =====================================================================
-        #  4. BUILDINGS – extruded boxes at terrain elevation
+        #  4. BUILDINGS - extruded boxes at terrain elevation
         # =====================================================================
         if p.get('include_buildings', True) and self.buildings:
             for building in self.buildings:
@@ -571,7 +570,7 @@ class ObjExportTask(QgsTask):
 
                 bid = building.get('x', 'x')
                 writer.begin_group(f'Building_walls', 'mat_building')
-                
+
                 for cell in building.get('cell_details', []):
                     cx = (cell['x_min'] + cell['x_max']) / 2.0
                     cy = (cell['y_min'] + cell['y_max']) / 2.0
@@ -651,11 +650,18 @@ def export_to_obj(plugin_ref):
 
     input_file = dlg.get_input_file()
     params = dlg.get_params()
+    output_path = dlg.get_output_file()
 
     if not input_file:
         from qgis.PyQt.QtWidgets import QMessageBox
         QMessageBox.warning(plugin_ref.iface.mainWindow(), plugin_ref.tr("Error"),
                             plugin_ref.tr("Please select a LAS/LAZ file."))
+        return
+
+    if not output_path:
+        from qgis.PyQt.QtWidgets import QMessageBox
+        QMessageBox.warning(plugin_ref.iface.mainWindow(), plugin_ref.tr("Error"),
+                            plugin_ref.tr("Please choose an output OBJ file."))
         return
 
     # Normalize path for comparison
@@ -670,7 +676,7 @@ def export_to_obj(plugin_ref):
 
     if has_matching_data:
         # Cached data matches selected file, export directly
-        _do_obj_export(plugin_ref, params)
+        _do_obj_export(plugin_ref, params, output_path=output_path)
     else:
         # Different file or no cache: run quick classify first
         task_desc = f"Classifying {os.path.basename(input_file)} for OBJ export"
@@ -681,7 +687,7 @@ def export_to_obj(plugin_ref):
         def on_classify_done(result):
             original_finished(result)
             if result:
-                _do_obj_export(plugin_ref, params)
+                _do_obj_export(plugin_ref, params, output_path=output_path)
         task.finished = on_classify_done
 
         plugin_ref.running_tasks.append(task)
@@ -694,15 +700,19 @@ def export_to_obj(plugin_ref):
         )
 
 
-def _do_obj_export(plugin_ref, params):
+def _do_obj_export(plugin_ref, params, output_path=None):
     """Launch the OBJ export task."""
-    from .obj_export_dialog import ObjExportDialog
 
     data = plugin_ref.last_classification_data
 
-    # Auto-generate output path in project directory
-    base_path = os.path.splitext(data['filename'])[0]
-    output_path = base_path + "_3d_scene.obj"
+    if output_path is None:
+        output_path = params.get('output_obj')
+    if output_path is None:
+        # Auto-generate output path in project directory
+        base_path = os.path.splitext(data['filename'])[0]
+        output_path = base_path + "_3d_scene.obj"
+    if not os.path.splitext(output_path)[1].lower() == '.obj':
+        output_path += '.obj'
 
     task_desc = f"Exporting to OBJ → {os.path.basename(output_path)}"
     task = ObjExportTask(

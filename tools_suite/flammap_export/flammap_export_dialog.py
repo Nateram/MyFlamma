@@ -21,7 +21,7 @@ class FlamMapExportDialog(QDialog):
 
         # --- Window ---
         self.setWindowTitle(self.tr("Export to FlamMap GeoTIFF"))
-        self.resize(850, 500)
+        self.resize(850, 560)
         self.setMinimumWidth(800)
         self.setModal(False)
 
@@ -304,7 +304,7 @@ class FlamMapExportDialog(QDialog):
                 elif item.layout():
                     clear_layout(item.layout())
         clear_layout(self.ignition_layout_inner)
-        
+
         # Add new
         for i, (x, y) in enumerate(self.ignition_points):
             h_layout = QHBoxLayout()

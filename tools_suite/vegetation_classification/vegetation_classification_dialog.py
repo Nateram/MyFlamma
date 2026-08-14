@@ -86,12 +86,12 @@ class VegetationClassificationDialog(QDialog):
         self.high_thresh_spin.valueChanged.connect(self.validate_thresholds)
 
         left_layout.addWidget(param_group)
-        
+
         # --- Size classification group ---
         size_group = QGroupBox(self.tr("Size Classification"))
         size_layout = QFormLayout(size_group)
         size_layout.setLabelAlignment(Qt.AlignRight)
-        
+
         # Height threshold for shrubs/trees
         self.size_threshold_spin = QDoubleSpinBox()
         self.size_threshold_spin.setRange(0.1, 100.0)
@@ -101,54 +101,54 @@ class VegetationClassificationDialog(QDialog):
         self.size_threshold_spin.setSuffix(" m")
         self.size_threshold_spin.setToolTip(self.tr("Trees >= this height, Shrubs < this height"))
         size_layout.addRow(self.tr("Shrub/Tree threshold:"), self.size_threshold_spin)
-        
+
         left_layout.addWidget(size_group)
-        
+
         # --- Export options group ---
         export_group = QGroupBox(self.tr("Export Options"))
         export_layout = QVBoxLayout(export_group)
-        
+
         # Toggle all button
         self.toggle_all_csv_btn = QPushButton(self.tr("Enable All CSV"))
         self.toggle_all_csv_btn.setCheckable(True)
         self.toggle_all_csv_btn.setChecked(False)
         self.toggle_all_csv_btn.clicked.connect(self.toggle_all_csv)
         export_layout.addWidget(self.toggle_all_csv_btn)
-        
+
         # CSV export checkboxes - all disabled by default
         self.export_trees_check = QCheckBox(self.tr("Export trees to CSV"))
         self.export_trees_check.setChecked(False)
         self.export_trees_check.setToolTip(self.tr("Save detected trees to _metrics.csv"))
         export_layout.addWidget(self.export_trees_check)
-        
+
         self.export_shrubs_check = QCheckBox(self.tr("Export shrubs to CSV"))
         self.export_shrubs_check.setChecked(False)
         self.export_shrubs_check.setToolTip(self.tr("Save detected shrubs to _shrubs.csv"))
         export_layout.addWidget(self.export_shrubs_check)
-        
+
         self.export_grass_check = QCheckBox(self.tr("Export grass areas to CSV"))
         self.export_grass_check.setChecked(False)
         self.export_grass_check.setToolTip(self.tr("Save detected grass cell details to _grass_areas.csv (grass visualization always shown)"))
         export_layout.addWidget(self.export_grass_check)
-        
+
         self.export_buildings_check = QCheckBox(self.tr("Export buildings to CSV"))
         self.export_buildings_check.setChecked(False)
         self.export_buildings_check.setToolTip(self.tr("Save detected buildings to _buildings.csv"))
         export_layout.addWidget(self.export_buildings_check)
-        
+
         self.export_reclassified_check = QCheckBox(self.tr("Export reclassified LAZ"))
         self.export_reclassified_check.setChecked(False)
         self.export_reclassified_check.setToolTip(self.tr("Save a reclassified LAZ file with grass points changed from Class 2 to Class 3"))
         export_layout.addWidget(self.export_reclassified_check)
-        
+
         left_layout.addWidget(export_group)
-        
+
         # --- Old export checkbox (hidden for compatibility) ---
         self.export_csv_check = QCheckBox(self.tr("Export trees to CSV file"))
         self.export_csv_check.setChecked(True)
         self.export_csv_check.setVisible(False)
         left_layout.addWidget(self.export_csv_check)
-        
+
         left_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
 
         # --- OK / Cancel buttons ---
@@ -173,33 +173,16 @@ class VegetationClassificationDialog(QDialog):
 
         title = self.tr("Data Classification")
         intro = self.tr(
-            "This tool classifies LiDAR data into vegetation categories (trees, shrubs, grass) "
-            "and buildings, extracting metrics and exporting results to CSV."
+            "This tool classifies LiDAR data into vegetation categories (trees, shrubs, grass) and buildings, extracting metrics and exporting results to CSV."
         )
         workflow = self.tr("Workflow:")
         step1 = self.tr("Detects trees using CHM (Canopy Height Model) with Gaussian smoothing.")
         step2 = self.tr("Detects shrubs using DBSCAN clustering on medium vegetation (Class 4).")
         step3 = self.tr("Detects grass areas using ExG color index and existing Class 3 points.")
-        sub1 = self.tr("Detects buildings using DBSCAN clustering on Class 6 points.")
-        sub2 = self.tr("Optionally exports reclassified LAZ (grass Class 2 → Class 3).")
-        sub3 = self.tr("Exports CSV files with coordinates and metrics for each category.")
-        note = self.tr(
-            "Each detected element includes coordinates (X, Y), height, crown diameter, area, "
-            "point density, and RGB color for optimal export to FlamMap or Unity."
-        )
-
-        desc_text = (
-            f"<b>{self.tr('Data Classification')}</b><br>"
-            f"{self.tr('This tool classifies LiDAR data into vegetation categories (trees, shrubs, grass) and buildings, extracting metrics and exporting results to CSV.')}<br>"
-            f"{self.tr('Workflow:')}<br>"
-            f"{self.tr('Detects trees using CHM (Canopy Height Model) with Gaussian smoothing.')}<br>"
-            f"{self.tr('Detects shrubs using DBSCAN clustering on medium vegetation (Class 4).')}<br>"
-            f"{self.tr('Detects grass areas using ExG color index and existing Class 3 points.')}<br>"
-            f"{self.tr('Detects buildings using DBSCAN clustering on Class 6 points.')}<br>"
-            f"{self.tr('Optionally exports reclassified LAZ (grass Class 2 → Class 3).')}<br>"
-            f"{self.tr('Exports CSV files with coordinates and metrics for each category.')}<br>"
-            f"{self.tr('Each detected element includes coordinates (X, Y), height, crown diameter, area, point density, and RGB color for optimal export to FlamMap or Unity.')}"
-        )
+        step4 = self.tr("Detects buildings using DBSCAN clustering on Class 6 points.")
+        step5 = self.tr("Optionally exports reclassified LAZ (grass Class 2 → Class 3).")
+        step6 = self.tr("Exports CSV files with coordinates and metrics for each category.")
+        note = self.tr("Each detected element includes coordinates (X, Y), height, crown diameter, area, " "point density, and RGB color for optimal export to FlamMap or Unity.")
 
         desc_html = f"""
             <div style="position: relative;">
@@ -211,11 +194,9 @@ class VegetationClassificationDialog(QDialog):
                     <li>{step1}</li>
                     <li>{step2}</li>
                     <li>{step3}</li>
-                    <ul>
-                        <li><b>{sub1}</b></li>
-                        <li><b>{sub2}</b></li>
-                        <li><b>{sub3}</b></li>
-                    </ul>
+                    <li>{step4}</li>
+                    <li>{step5}</li>
+                    <li>{step6}</li>
                 </ul>
                 <p style="margin-top:4px; font-size:9pt; color:#666;">{note}</p>
             </div>
@@ -327,15 +308,15 @@ class VegetationClassificationDialog(QDialog):
     def get_export_csv(self):
         """Return whether to export trees to CSV."""
         return self.export_csv_check.isChecked()
-    
+
     def get_size_threshold(self):
         """Return the height threshold for separating shrubs and trees."""
         return self.size_threshold_spin.value()
-    
+
     def get_export_options(self):
         """Return export options (trees, shrubs, grass, buildings, reclassified_laz)."""
-        return (self.export_trees_check.isChecked(), 
-                self.export_shrubs_check.isChecked(), 
+        return (self.export_trees_check.isChecked(),
+                self.export_shrubs_check.isChecked(),
                 self.export_grass_check.isChecked(),
                 self.export_buildings_check.isChecked(),
                 self.export_reclassified_check.isChecked())
