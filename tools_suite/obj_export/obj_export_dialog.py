@@ -7,20 +7,19 @@ import os
 from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QGroupBox, QCheckBox, QDoubleSpinBox, QSpinBox, QLineEdit,
-    QFileDialog, QMessageBox, QDialogButtonBox, QWidget, QSpacerItem,
-    QSizePolicy, QTextBrowser
+    QComboBox, QFileDialog, QMessageBox, QDialogButtonBox, QWidget, QSpacerItem, QSizePolicy, QTextBrowser
 )
 from qgis.PyQt.QtCore import Qt
 from qgis.core import QgsProject, QgsPointCloudLayer
 
 
 class ObjExportDialog(QDialog):
-    def __init__(self, parent=None, translator=None, require_input=False, iface=None):
+    def __init__(self, parent=None, translator=None, iface=None):
         super().__init__(parent)
         self.tr_func = translator if translator else lambda x: x
-        self.require_input = True  # Always require input file selection
         self.iface = iface
         self.selected_output = None
+        self.selected_input = None
         self.user_edited_output = False
         self._updating_output = False
         self.setWindowTitle(self.tr_func("Export to OBJ"))
@@ -39,32 +38,20 @@ class ObjExportDialog(QDialog):
         left_layout.setAlignment(Qt.AlignTop)
 
         # --- Input file ---
-        if self.require_input:
-            input_group = QGroupBox(self.tr_func("Input LAS/LAZ File"))
-            input_layout = QVBoxLayout()
+        left_layout.addWidget(QLabel(self.tr_func("LiDAR layer or file:")))
+        file_row = QHBoxLayout()
 
-            # File selector
-            file_row = QHBoxLayout()
-            file_row.addWidget(QLabel(self.tr_func("Selected file:")))
+        self.input_combo = QComboBox()
+        self.input_combo.setToolTip(self.tr_func("Select a point cloud layer from the project"))
+        file_row.addWidget(self.input_combo)
 
-            self.input_edit = QLineEdit()
-            self.input_edit.setPlaceholderText(self.tr_func("Browse for LAS/LAZ file..."))
+        btn_browse = QPushButton(self.tr_func("..."))
+        btn_browse.setFixedWidth(28)
+        btn_browse.setToolTip(self.tr_func("Select input file (.las / .laz)"))
+        btn_browse.clicked.connect(self._browse_input)
+        file_row.addWidget(btn_browse)
 
-            # Pre-fill with last imported layer if available
-            last_layer_path = self._get_last_point_cloud_layer()
-            if last_layer_path:
-                self.input_edit.setText(last_layer_path)
-
-            file_row.addWidget(self.input_edit)
-
-            btn_browse = QPushButton(self.tr_func("..."))
-            btn_browse.setFixedWidth(28)
-            btn_browse.clicked.connect(self._browse_input)
-            file_row.addWidget(btn_browse)
-
-            input_layout.addLayout(file_row)
-            input_group.setLayout(input_layout)
-            left_layout.addWidget(input_group)
+        left_layout.addLayout(file_row)
 
         # --- Output file ---
         left_layout.addWidget(QLabel(self.tr_func("Output OBJ File")))
@@ -82,6 +69,9 @@ class ObjExportDialog(QDialog):
         output_layout.addWidget(btn_output)
 
         left_layout.addLayout(output_layout)
+
+        self.populate_input_layers()
+        self.input_combo.currentIndexChanged.connect(self._on_layer_changed)
 
         if self.get_input_file():
             self._update_default_output()
@@ -203,27 +193,38 @@ class ObjExportDialog(QDialog):
         main_layout.addWidget(desc_box, stretch=2)
 
     def _get_point_cloud_layers(self):
-        """Get list of (layer_name, layer_path) for point cloud layers in project."""
+        """Get valid point cloud layers currently loaded in the project."""
         layers = []
         project = QgsProject.instance()
         for layer in project.mapLayers().values():
             if isinstance(layer, QgsPointCloudLayer) and layer.isValid():
-                source = layer.source()
-                layers.append((layer.name(), source))
+                layers.append(layer)
         return layers
 
-    def _get_last_point_cloud_layer(self):
-        """Get the path of the last imported point cloud layer, or None."""
-        layers = self._get_point_cloud_layers()
-        if layers:
-            return layers[-1][1]  # Return the path of the last layer
-        return None
+    def populate_input_layers(self):
+        """Populate the input selector with point cloud layers in the project."""
+        self.input_combo.clear()
+        for layer in self._get_point_cloud_layers():
+            crs = f" [{layer.crs().authid()}]" if layer.crs().isValid() else ""
+            self.input_combo.addItem(
+                f"{layer.name()}{crs}",
+                layer.source()
+            )
+
+        if self.input_combo.count():
+            self.input_combo.setCurrentIndex(0)
+            self._on_layer_changed(0)
 
     def _on_layer_changed(self, index):
-        """When user changes the layer selection, update the file path."""
-        if hasattr(self, 'layer_combo') and index >= 0:
-            selected_path = self.layer_combo.itemData(index)
-            self.input_edit.setText(selected_path)
+        """Update the selected input path when a project layer is chosen."""
+        if index < 0:
+            self.selected_input = None
+            return
+
+        selected_path = self.input_combo.itemData(index)
+        self.selected_input = selected_path
+        if not self.user_edited_output:
+            self._update_default_output()
 
     def _browse_input(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -231,7 +232,12 @@ class ObjExportDialog(QDialog):
             self.tr_func("LiDAR Files (*.las *.laz)")
         )
         if path:
-            self.input_edit.setText(path)
+            existing_index = self.input_combo.findData(path)
+            if existing_index == -1:
+                self.input_combo.addItem(os.path.basename(path), path)
+                existing_index = self.input_combo.count() - 1
+            self.input_combo.setCurrentIndex(existing_index)
+            self.selected_input = path
             self.user_edited_output = False
             self._update_default_output()
 
@@ -279,7 +285,7 @@ class ObjExportDialog(QDialog):
 
     def _validate_and_accept(self):
         input_file = self.get_input_file()
-        if self.require_input and not input_file:
+        if not input_file:
             QMessageBox.warning(self, self.tr_func("No Input"),
                                 self.tr_func("Please select a LAS/LAZ file or use an imported layer."))
             return
@@ -292,7 +298,7 @@ class ObjExportDialog(QDialog):
 
     def get_input_file(self):
         """Return input file path."""
-        return self.input_edit.text().strip()
+        return (self.selected_input or "").strip()
 
     def get_output_file(self):
         """Return output OBJ file path, ensuring a .obj extension."""

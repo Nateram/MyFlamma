@@ -643,7 +643,7 @@ def export_to_obj(plugin_ref):
     from .quick_classify import QuickClassifyTask
 
     # Always show dialog with file selector
-    dlg = ObjExportDialog(plugin_ref.iface.mainWindow(), translator=plugin_ref.tr, require_input=True, iface=plugin_ref.iface)
+    dlg = ObjExportDialog(plugin_ref.iface.mainWindow(), translator=plugin_ref.tr, iface=plugin_ref.iface)
 
     if dlg.exec_() != ObjExportDialog.Accepted:
         return
