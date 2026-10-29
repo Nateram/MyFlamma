@@ -68,15 +68,12 @@ class VegetationClassificationCHMTask(QgsTask):
                 elif height < 18.0: return 5.0
                 else: return 7.0
             
-            def classify_tree_size_by_density(x, y, density_points_in_radius):
-                """Clasifica el tamaño del árbol en 5 categorías basadas en densidad."""
-                if density_points_in_radius is None or len(density_points_in_radius) == 0:
-                    return "Medium", 0
-                
-                quantiles = [0, 20, 40, 60, 80, 100]
-                percentiles = np.percentile(density_points_in_radius, quantiles)
-                point_count = len(density_points_in_radius)
-                
+            def classify_tree_size_by_density(point_count, percentiles):
+                """Clasifica el tamaño del árbol en 5 categorías según los quintiles
+                del número de puntos alrededor de todos los picos."""
+                if percentiles is None:
+                    return "Medium", point_count
+
                 if point_count <= percentiles[1]:
                     return "Very Small", point_count
                 elif point_count <= percentiles[2]:
@@ -90,9 +87,11 @@ class VegetationClassificationCHMTask(QgsTask):
             
             # --- PASO 1: Leer archivo LAS/LAZ ---
             las = laspy.read(self.filename, laz_backend=LazBackend.Lazrs)
+            # laspy 2.x no expone header.epsg: se obtiene del CRS (VLR GeoTIFF/WKT)
             try:
-                self.epsg = las.header.epsg if hasattr(las.header, 'epsg') else None
-            except:
+                crs = las.header.parse_crs()
+                self.epsg = crs.to_epsg() if crs is not None else None
+            except Exception:
                 self.epsg = None
 
             # --- PASO 2: Extraer datos ---
@@ -187,145 +186,148 @@ class VegetationClassificationCHMTask(QgsTask):
                 self.visualization_data = []
                 self.stats = {"num_trees": 0, "num_shrubs": 0}
                 return True
-                self.stats = {"num_tree": 0, "num_high_orig": len(veg_x)}
-                return True
 
             # --- PASO 4: RASTERIZACIÓN CHM ---
             self.setProgress(50)
             pixel_size = 0.5
-            
-            min_x, max_x = np.min(final_x), np.max(final_x)
-            min_y, max_y = np.min(final_y), np.max(final_y)
-            
-            cols = int((max_x - min_x) / pixel_size) + 1
-            rows = int((max_y - min_y) / pixel_size) + 1
-            
-            chm_grid = np.zeros((rows, cols), dtype=np.float32)
-            idx_col = ((final_x - min_x) / pixel_size).astype(int)
-            idx_row = ((max_y - final_y) / pixel_size).astype(int)
-            
-            sort_idx = np.argsort(final_h)
-            chm_grid[idx_row[sort_idx], idx_col[sort_idx]] = final_h[sort_idx]
 
-            # --- PASO 5: SUAVIZADO GAUSSIANO ---
-            sigma = 1.5  
-            smoothed_chm = gaussian_filter(chm_grid, sigma=sigma)
+            # Sin puntos altos no hay CHM, pero se sigue con arbustos, césped y edificios
+            if len(final_x) == 0:
+                final_features = []
+            else:
+                min_x, max_x = np.min(final_x), np.max(final_x)
+                min_y, max_y = np.min(final_y), np.max(final_y)
+            
+                cols = int((max_x - min_x) / pixel_size) + 1
+                rows = int((max_y - min_y) / pixel_size) + 1
+            
+                chm_grid = np.zeros((rows, cols), dtype=np.float32)
+                idx_col = ((final_x - min_x) / pixel_size).astype(int)
+                idx_row = ((max_y - final_y) / pixel_size).astype(int)
+            
+                sort_idx = np.argsort(final_h)
+                chm_grid[idx_row[sort_idx], idx_col[sort_idx]] = final_h[sort_idx]
 
-            # --- PASO 6: DETECCIÓN DE PICOS ---
-            window_size = 7 
-            local_max = maximum_filter(smoothed_chm, size=window_size)
-            peaks = (smoothed_chm == local_max) & (smoothed_chm > self.high_thresh)
-            
-            peak_rows, peak_cols = np.where(peaks)
-            raw_peak_x = min_x + (peak_cols * pixel_size) + (pixel_size / 2)
-            raw_peak_y = max_y - (peak_rows * pixel_size) - (pixel_size / 2)
-            raw_peak_h = smoothed_chm[peak_rows, peak_cols]
+                # --- PASO 5: SUAVIZADO GAUSSIANO ---
+                sigma = 1.5  
+                smoothed_chm = gaussian_filter(chm_grid, sigma=sigma)
 
-            # --- PASO 7: FUSIÓN DE PICOS ---
-            self.setProgress(70)
+                # --- PASO 6: DETECCIÓN DE PICOS ---
+                window_size = 7 
+                local_max = maximum_filter(smoothed_chm, size=window_size)
+                peaks = (smoothed_chm == local_max) & (smoothed_chm > self.high_thresh)
             
-            sorted_peak_idx = np.argsort(-raw_peak_h)
-            sorted_px = raw_peak_x[sorted_peak_idx]
-            sorted_py = raw_peak_y[sorted_peak_idx]
-            sorted_ph = raw_peak_h[sorted_peak_idx]
-            
-            peaks_tree = cKDTree(np.column_stack((sorted_px, sorted_py)))
-            processed_peaks = np.zeros(len(sorted_px), dtype=bool)
-            
-            final_features = []
-            
-            b_tree = None
-            if has_buildings:
-                if len(build_x) > 200000:
-                    idx_rnd = np.random.choice(len(build_x), 200000, replace=False)
-                    b_tree = cKDTree(np.column_stack((build_x[idx_rnd], build_y[idx_rnd])))
-                else:
-                    b_tree = cKDTree(np.column_stack((build_x, build_y)))
-            
-            veg_tree = cKDTree(np.column_stack((final_x, final_y)))
-            
-            total_peaks = len(sorted_px)
-            MIN_DIST_TO_BUILDING = 2.0
-            
-            all_densities = []
-            for i in range(total_peaks):
-                current_h = sorted_ph[i]
-                merge_radius = get_merge_radius(current_h)
-                neighbors = veg_tree.query_ball_point([sorted_px[i], sorted_py[i]], r=merge_radius)
-                all_densities.append(len(neighbors))
+                peak_rows, peak_cols = np.where(peaks)
+                raw_peak_x = min_x + (peak_cols * pixel_size) + (pixel_size / 2)
+                raw_peak_y = max_y - (peak_rows * pixel_size) - (pixel_size / 2)
+                raw_peak_h = smoothed_chm[peak_rows, peak_cols]
 
-            for i in range(total_peaks):
-                if i % 100 == 0:
-                    if self.isCanceled(): return False
-                    self.setProgress(70 + (30 * i / max(1, total_peaks)))
-
-                if processed_peaks[i]: continue
-
-                current_h = sorted_ph[i]
-                merge_radius = get_merge_radius(current_h)
-                cluster_idx = peaks_tree.query_ball_point([sorted_px[i], sorted_py[i]], r=merge_radius)
-                
-                cluster_x = sorted_px[cluster_idx]
-                cluster_y = sorted_py[cluster_idx]
-                
-                centroid_x = float(np.mean(cluster_x))
-                centroid_y = float(np.mean(cluster_y))
-                max_h = float(current_h)
-                
-                # Densidad y tamaño (LÓGICA ORIGINAL)
-                density_neighbors = veg_tree.query_ball_point([centroid_x, centroid_y], r=merge_radius)
-                tree_size, point_count = classify_tree_size_by_density(centroid_x, centroid_y, all_densities)
-                
-                processed_peaks[cluster_idx] = True
-                
-                # Check de edificios
-                is_valid = True
+                # --- PASO 7: FUSIÓN DE PICOS ---
+                self.setProgress(70)
+            
+                sorted_peak_idx = np.argsort(-raw_peak_h)
+                sorted_px = raw_peak_x[sorted_peak_idx]
+                sorted_py = raw_peak_y[sorted_peak_idx]
+                sorted_ph = raw_peak_h[sorted_peak_idx]
+            
+                peaks_tree = cKDTree(np.column_stack((sorted_px, sorted_py)))
+                processed_peaks = np.zeros(len(sorted_px), dtype=bool)
+            
+                final_features = []
+            
+                b_tree = None
                 if has_buildings:
-                    d, _ = b_tree.query([centroid_x, centroid_y], k=1, distance_upper_bound=MIN_DIST_TO_BUILDING)
-                    if d != float('inf'): is_valid = False
+                    if len(build_x) > 200000:
+                        idx_rnd = np.random.choice(len(build_x), 200000, replace=False)
+                        b_tree = cKDTree(np.column_stack((build_x[idx_rnd], build_y[idx_rnd])))
+                    else:
+                        b_tree = cKDTree(np.column_stack((build_x, build_y)))
+            
+                veg_tree = cKDTree(np.column_stack((final_x, final_y)))
+            
+                total_peaks = len(sorted_px)
+                MIN_DIST_TO_BUILDING = 2.0
+            
+                all_densities = []
+                for i in range(total_peaks):
+                    current_h = sorted_ph[i]
+                    merge_radius = get_merge_radius(current_h)
+                    neighbors = veg_tree.query_ball_point([sorted_px[i], sorted_py[i]], r=merge_radius)
+                    all_densities.append(len(neighbors))
+                all_percentiles = np.percentile(all_densities, [0, 20, 40, 60, 80, 100]) if all_densities else None
+
+                for i in range(total_peaks):
+                    if i % 100 == 0:
+                        if self.isCanceled(): return False
+                        self.setProgress(70 + (30 * i / max(1, total_peaks)))
+
+                    if processed_peaks[i]: continue
+
+                    current_h = sorted_ph[i]
+                    merge_radius = get_merge_radius(current_h)
+                    cluster_idx = peaks_tree.query_ball_point([sorted_px[i], sorted_py[i]], r=merge_radius)
                 
-                if is_valid:
-                    # --- CALCULAR MÉTRICAS DENDROMÉTRICAS ---
-                    tree_points_idx = density_neighbors
+                    cluster_x = sorted_px[cluster_idx]
+                    cluster_y = sorted_py[cluster_idx]
+                
+                    centroid_x = float(np.mean(cluster_x))
+                    centroid_y = float(np.mean(cluster_y))
+                    max_h = float(current_h)
+                
+                    # Densidad y tamaño (LÓGICA ORIGINAL)
+                    density_neighbors = veg_tree.query_ball_point([centroid_x, centroid_y], r=merge_radius)
+                    tree_size, point_count = classify_tree_size_by_density(len(density_neighbors), all_percentiles)
+                
+                    processed_peaks[cluster_idx] = True
+                
+                    # Check de edificios
+                    is_valid = True
+                    if has_buildings:
+                        d, _ = b_tree.query([centroid_x, centroid_y], k=1, distance_upper_bound=MIN_DIST_TO_BUILDING)
+                        if d != float('inf'): is_valid = False
+                
+                    if is_valid:
+                        # --- CALCULAR MÉTRICAS DENDROMÉTRICAS ---
+                        tree_points_idx = density_neighbors
                     
-                    crown_diam = 0.0
-                    crown_area = 0.0
-                    avg_rgb = "N/A"
-                    density = 0.0
+                        crown_diam = 0.0
+                        crown_area = 0.0
+                        avg_rgb = "N/A"
+                        density = 0.0
                     
-                    if len(tree_points_idx) > 0:
-                        tx = final_x[tree_points_idx]
-                        ty = final_y[tree_points_idx]
+                        if len(tree_points_idx) > 0:
+                            tx = final_x[tree_points_idx]
+                            ty = final_y[tree_points_idx]
                         
-                        range_x = np.max(tx) - np.min(tx)
-                        range_y = np.max(ty) - np.min(ty)
-                        crown_diam = float((range_x + range_y) / 2.0)
+                            range_x = np.max(tx) - np.min(tx)
+                            range_y = np.max(ty) - np.min(ty)
+                            crown_diam = float((range_x + range_y) / 2.0)
                         
-                        radius_est = crown_diam / 2.0
-                        crown_area = float(np.pi * (radius_est ** 2))
+                            radius_est = crown_diam / 2.0
+                            crown_area = float(np.pi * (radius_est ** 2))
                         
-                        if crown_area > 0:
-                            density = len(tree_points_idx) / crown_area
+                            if crown_area > 0:
+                                density = len(tree_points_idx) / crown_area
                         
-                        if has_color:
-                            original_indices = final_color_indices_trees[tree_points_idx]
-                            r_val = int(np.mean(trees_r[original_indices]))
-                            g_val = int(np.mean(trees_g[original_indices]))
-                            b_val = int(np.mean(trees_b[original_indices]))
-                            avg_rgb = f"{r_val},{g_val},{b_val}"
+                            if has_color:
+                                original_indices = final_color_indices_trees[tree_points_idx]
+                                r_val = int(np.mean(trees_r[original_indices]))
+                                g_val = int(np.mean(trees_g[original_indices]))
+                                b_val = int(np.mean(trees_b[original_indices]))
+                                avg_rgb = f"{r_val},{g_val},{b_val}"
                     
-                    final_features.append({
-                        "x": centroid_x, 
-                        "y": centroid_y, 
-                        "height": max_h, 
-                        "type": "tree",
-                        "size": tree_size,
-                        "point_count": len(density_neighbors),
-                        "crown_diam": crown_diam,
-                        "crown_area": crown_area,
-                        "color_rgb": avg_rgb,
-                        "density": density
-                    })
+                        final_features.append({
+                            "x": centroid_x, 
+                            "y": centroid_y, 
+                            "height": max_h, 
+                            "type": "tree",
+                            "size": tree_size,
+                            "point_count": len(density_neighbors),
+                            "crown_diam": crown_diam,
+                            "crown_area": crown_area,
+                            "color_rgb": avg_rgb,
+                            "density": density
+                        })
 
             # --- DETECCIÓN DE ÁRBOLES (Finalizada) ---
             trees_detected = [f for f in final_features if f['height'] >= self.size_threshold]

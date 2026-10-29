@@ -514,11 +514,11 @@ class ObjExportTask(QgsTask):
         #  3. TREES - rectangular trunk + cube crown at terrain elevation
         # =====================================================================
         if p.get('include_trees', True) and self.trees:
-            for tree in self.trees:
+            for tree_idx, tree in enumerate(self.trees, 1):
                 if self.isCanceled():
                     return False
 
-                tx = (tree.get('x', 0) - origin_x) * scale
+                tx =(tree.get('x', 0) - origin_x) * scale
                 tz = (origin_z - tree.get('y', 0)) * scale  # flipped
                 elev = get_terrain_elev(tree.get('x', 0), tree.get('y', 0))
                 t_height = max(tree.get('height', 1.0), 1.0) * scale
@@ -533,7 +533,8 @@ class ObjExportTask(QgsTask):
                 if trunk_top < 0.5 * scale:
                     trunk_top = t_height * 0.4
 
-                tree_id = tree.get('Tree_ID', tree.get('Tree_ID', 'x'))
+                # Unique group name per tree so each one can be selected in Unity/Blender
+                tree_id = tree.get('Tree_ID', tree_idx)
                 # Trunk
                 writer.begin_group(f'Tree_{tree_id}_trunk', 'mat_trunk')
                 writer.add_box(

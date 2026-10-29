@@ -41,9 +41,16 @@ class QuickClassifyTask(QgsTask):
 
             has_color = hasattr(las, 'red') and hasattr(las, 'green') and hasattr(las, 'blue')
             if has_color:
-                red = np.array(las.red, dtype=np.uint8)
-                green = np.array(las.green, dtype=np.uint8)
-                blue = np.array(las.blue, dtype=np.uint8)
+                # LAS stores RGB as 16-bit; casting directly to uint8 wraps values
+                # and breaks the ExG index, so rescale like the main classifier.
+                red = np.array(las.red)
+                green = np.array(las.green)
+                blue = np.array(las.blue)
+                if max(red.max(initial=0), green.max(initial=0), blue.max(initial=0)) > 255:
+                    red, green, blue = (red // 256), (green // 256), (blue // 256)
+                red = red.astype(np.uint8)
+                green = green.astype(np.uint8)
+                blue = blue.astype(np.uint8)
 
             QgsMessageLog.logMessage(self.tr(f"Classify: Read {len(x)} points from {os.path.basename(self.filename)}"), "MyFlamma", Qgis.Info)
             self.setProgress(10)
@@ -702,10 +709,8 @@ class QuickClassifyTask(QgsTask):
                 col_idx = np.clip(((gx_t - t_x_min) / terrain_cell).astype(int), 0, t_cols - 1)
                 row_idx = np.clip(((gy_t - t_y_min) / terrain_cell).astype(int), 0, t_rows - 1)
 
-                for i in range(len(gx_t)):
-                    c, r = col_idx[i], row_idx[i]
-                    z_sum[r, c] += gz_t[i]
-                    z_count[r, c] += 1
+                np.add.at(z_sum, (row_idx, col_idx), gz_t)
+                np.add.at(z_count, (row_idx, col_idx), 1)
 
                 # Mean height where we have data
                 valid = z_count > 0
