@@ -1,23 +1,13 @@
 # MyFlamma
 
+![description](icons/MyFlamma_logo.png)
+
 [Español](#español) | [English](#english)
 
 ## English
 
 ### Description
-**MyFlamma** is a QGIS 3.44 plugin that provides an expanding suite of tools to process and analyze LiDAR point clouds.
-In addition to generating detailed reports from LAS/LAZ files, the plugin offers point cloud cleaning, vegetation classification, building counting, and statistical analysis, all integrated directly into QGIS.
-
-### Features
-- **Generation of LiDAR file reports** with metadata, spatial properties, intensity, classifications, returns, and GPS time.
-- **Deletion of outliers** to clean up noise in the datasets.
-- **Deletion of overlapping** or redundant points.
-- **Counting of buildings** detected in the dataset.
-- **Classification of vegetation** based on its relative height.
-- **Generation of digital elevation models (DEM) of bare terrain** from LiDAR files, as well as their corresponding relief shadow maps.
-- **Visualisation of LAS/LAZ file statistics**, including density, ranges and classification counts.
-
-These functions are compatible with LiDAR `.las` and `.laz` files, and their execution is aided by an intuitive user interface, integrated directly into the QGIS menu.
+**MyFlamma** is an open-source QGIS plugin designed to process and classify aerial LiDAR point clouds automatically and subsequently export generated results as Flammap inputs for fire simulations and lightweight 3D OBJ models.
 
 ### Installation
 1. Download the plugin by clicking on `<Code> → Download ZIP`, at the top of the repository.
@@ -48,13 +38,11 @@ These functions are compatible with LiDAR `.las` and `.laz` files, and their exe
 This plugin requires the following Python libraries:
 - **laspy** for reading and writing LAS/LAZ files.
 - **GDAL** and **OSR** for geospatial data manipulation.
-- **numpy** for numerical calculations and statistical queries. ()
+- **numpy** for numerical calculations and statistical queries.
 - **scikit-learn** for point clustering.
 - **scipy** for scientific data processing and analysis.
 - **matplotlib** for generating graphs and visualisations.
 - **reportlab** for generating PDF reports.
-
-**Note**: The numpy dependency used in the project is integrated into laspy, so there is no need to install it later on once the latter is installed.
 
 Currently, dependencies are installed automatically when importing the plugin as a ZIP file. However, in case of failure, it is possible to install them manually:
 
@@ -70,7 +58,7 @@ Currently, dependencies are installed automatically when importing the plugin as
 **Note**: make sure the command is executed inside the QGIS path. It should look something like this:
 
 ```bash
-C:\PROGRA~1\QGIS34~1.3>
+C:\PROGRA~1\QGISX>
 ```
 
 #### macOS
@@ -99,10 +87,10 @@ C:\PROGRA~1\QGIS34~1.3>
     ```
 
 ### Availability
-We recommend using the latest stable version of QGIS to take full advantage of its functionality. Not compatible with versions prior to QGIS 3.18.
+This plugin is available for QGIS versions >3.18 to 3.99 (`develop_3.0` branch) and 4.0 (`main` branch). We recommend using stable versions to get the most out of its functionality.
 
 ### Acknowledgements
-Plugin developed in collaboration with the Media Engineering Group (GIM) of the Polytechnic School of Cáceres.
+Plugin developed in collaboration with the "Grupo de Ingeniería de Medios (GIM)" of the Cáceres' School of Technology.
 
 ---
 
@@ -110,19 +98,7 @@ Plugin developed in collaboration with the Media Engineering Group (GIM) of the 
 
 ### Descripción
 
-**MyFlamma** es un complemento de QGIS 3.44 que proporciona un conjunto de herramientas en expansión para procesar y analizar nubes de puntos LiDAR.
-Además de generar informes detallados a partir de archivos LAS/LAZ, el complemento ofrece limpieza de nubes de puntos, clasificación de vegetación, recuento de edificios y análisis estadístico, todo ello integrado directamente en QGIS.
-
-### Características
-- **Generación de informes de archivos LiDAR** con metadatos, propiedades espaciales, intensidad, clasificaciones, retornos y hora GPS.
-- **Borrado de puntos atípicos** para limpiar el ruido de los conjuntos de datos.
-- **Borrado de puntos superpuestos** o redundantes.
-- **Recuento de edificios** detectados en el conjunto de datos.
-- **Clasificación de la vegetación** en función de su altura relativa.
-- **Generación de modelos digitales de elevación (DEM) del terreno desnudo**, junto con sus correspondientes mapas de sombras del relieve.
-- **Visualización de estadísticas de archivos LAS/LAZ**, incluyendo la densidad, los rangos y los recuentos de clasificación.
-
-Estas funciones son compatibles con archivos LiDAR `.las` y `.laz`, y su ejecución se ayuda de una interfaz de usuario intuitiva, integrada directamente dentro del menú de QGIS.
+**MyFlamma** es un complemento de código abierto para QGIS diseñado para procesar y clasificar automáticamente nubes de puntos LiDAR aéreas y, posteriormente, exportar los resultados generados como datos de entrada para Flammap, con el fin de realizar simulaciones de incendios y crear modelos 3D ligeros en formato OBJ.
 
 ### Instalación
 1. Descargue el complemento haciendo clic en ``<Código> → Descargar ZIP``, en la parte superior del repositorio.
@@ -158,8 +134,6 @@ Este complemento requiere las siguientes bibliotecas de Python:
 - **matplotlib** para la generación de gráficos y visualizaciones.
 - **reportlab** para la generación de informes en PDF.
 
-**Nota**: la dependencia numpy utilizada en el proyecto está integrada en laspy, por lo que no es necesario instalarla posteriormente una vez instalada esta última.
-
 Actualmente, las dependencias se instalan de manera automática en la importación del plugin como ZIP. En caso de fallo, sin embargo, es posible instalarlas manualmente:
 
 ### Instalar dependencias 
@@ -174,7 +148,7 @@ Actualmente, las dependencias se instalan de manera automática en la importaci�
 **Nota**: asegúrese de que el comando se ejecuta dentro de la ruta de QGIS. Esta debería tener un aspecto similar al siguiente:
 
 ```bash
-C:\PROGRA~1\QGIS34~1.3>
+C:\PROGRA~1\QGISX>
 ```
 
 #### macOS
@@ -203,7 +177,7 @@ C:\PROGRA~1\QGIS34~1.3>
     ```
 
 ### Disponibilidad
-Se recomienda utilizar la última versión estable de QGIS para aprovechar su funcionalidad al máximo. No compatible con versiones anteriores a QGIS 3.18.
+Este plugin está disponible para versiones de QGIS >3.18 a 3.99 (rama `develop_3.0`) y 4.0 (rama `main`). Se recomienda el uso de versiones estable para aprovechar su funcionalidad al máximo.
 
 ### Agradecimientos
 Complemento desarrollado en colaboración con el Grupo de Ingeniería de Medios (GIM) de la Escuela Politécnica de Cáceres.
