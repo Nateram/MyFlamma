@@ -1,6 +1,6 @@
 # MyFlamma
 
-![description](icons/MyFlamma_logo.png)
+![MyFlamma_logo](icons/myFlamma_logo.png)
 
 [Español](#español) | [English](#english)
 
