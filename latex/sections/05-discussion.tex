@@ -1,0 +1,22 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Classification Accuracy}
+
+The quality of MyFlamma's output is inherently tied to the quality of the input point cloud classification. Since the plugin relies on ASPRS class labels already present in the LAS file (ground, low/medium/high vegetation, building), any misclassification upstream propagates to the 3D scene. For instance, building points erroneously labeled as high vegetation will appear as trees in the OBJ output. Future versions could incorporate a re-classification step using geometric features (planarity, verticality) to mitigate this dependency.
+
+The ExG-based grass detection provides a simple yet effective filter when RGB channels are available. However, spectral indices computed from 8-bit LiDAR color bands are less reliable than those derived from multispectral sensors. Integration with co-registered orthophotography could improve grass boundary delineation.
+
+\subsection{Geometric Simplifications}
+
+All vegetation and building elements are represented as axis-aligned bounding boxes. This simplification keeps the OBJ file compact and rendering fast, but sacrifices geometric fidelity: tree crowns are rectangular rather than ellipsoidal, and buildings lack roof pitch detail. For fire simulation purposes---where canopy bulk density and vertical fuel distribution are more critical than visual realism---this trade-off is acceptable. Nonetheless, replacing boxes with parameterized ellipsoids or convex hulls would improve visual quality for presentation contexts.
+
+\subsection{Scalability}
+
+The current implementation loads the entire LAS file into memory. For tiles exceeding 20--30 million points (common in high-density airborne or UAV LiDAR), memory usage may become prohibitive. A tiled processing strategy, reading the file in spatial chunks with overlap buffers, would extend the plugin's applicability to large-area datasets.
+
+DBSCAN clustering has $O(n \log n)$ average-case complexity with a KD-tree spatial index. For 8 million points, the tree detection step completes in under 5 seconds; however, performance degrades for very dense urban vegetation where the number of high-vegetation points may exceed several million.
+
+\subsection{Integration with Fire Simulation}
+
+The OBJ output is designed as a visualization companion to FlamMap-compatible fuel exports already provided by the plugin's FlamMap Export tool. While the OBJ file itself is not directly consumable by FlamMap, it enables analysts to visually inspect the fuel classification and spatial arrangement before committing to a simulation run. Future work could bridge the OBJ geometry with voxel-based fuel models such as FUEL3D~\cite{parsons2011} for direct simulation input.

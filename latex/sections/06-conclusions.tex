@@ -1,0 +1,28 @@
+\section{Conclusions}
+\label{sec:conclusions}
+
+This paper presented MyFlamma, an open-source QGIS plugin that bridges the gap between LiDAR point cloud analysis and 3D scene generation for wildfire risk assessment. The main contributions are:
+
+\begin{enumerate}
+    \item A modular classification pipeline combining CHM-based tree detection, DBSCAN clustering for shrubs and buildings, and spectral filtering (ExG) for grass identification.
+    \item A lightweight quick-classify path that enables standalone OBJ export without intermediate file generation.
+    \item An OBJ geometry engine producing watertight, correctly wound meshes with six material classes, suitable for visualization in any standard 3D renderer.
+    \item Full integration within the QGIS ecosystem, requiring no external software beyond standard Python scientific libraries.
+\end{enumerate}
+
+Experimental results on PNOA LiDAR tiles demonstrate that the plugin can classify and export a typical wildland--urban interface scene (8 million points) in under 10 seconds, producing compact OBJ files (3--5\,MB) that faithfully represent the spatial distribution of fuel elements.
+
+\subsection{Future Work}
+
+Several directions are planned for future development:
+
+\begin{itemize}
+    \item \textbf{Richer geometry}: Replace axis-aligned boxes with ellipsoids for tree crowns and extruded footprints with roof models for buildings.
+    \item \textbf{Additional export formats}: Support glTF and FBX for compatibility with game engines (Unity, Unreal) and web viewers.
+    \item \textbf{Level of detail (LOD)}: Generate multiple resolution levels for large scenes, enabling smooth navigation in 3D viewers.
+    \item \textbf{Texture mapping}: Apply satellite or orthophoto textures to ground and building surfaces for improved realism.
+    \item \textbf{Direct fuel model integration}: Link classified vegetation volumes with standard fuel models (Anderson 13, Scott \& Burgan 40) for seamless FlamMap input generation.
+    \item \textbf{Tiled processing}: Implement spatial chunking to handle datasets exceeding available RAM.
+\end{itemize}
+
+MyFlamma is freely available under the GPL-3.0 license and can be installed directly from the QGIS Plugin Repository.

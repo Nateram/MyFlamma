@@ -1,0 +1,345 @@
+from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton,QDialogButtonBox, QFileDialog, QLineEdit, QSizePolicy, QTextBrowser, QWidget, QSpacerItem, QGroupBox, QFormLayout, QDoubleSpinBox, QCheckBox
+from qgis.PyQt.QtCore import Qt
+from qgis.core import QgsProject, QgsPointCloudLayer
+import os
+
+class VegetationClassificationDialog(QDialog):
+    """Dialog window for vegetation classification settings."""
+
+    def __init__(self, parent=None, translator=lambda s: s):
+        super().__init__(parent)
+        self.tr = translator
+        self.selected_input = None
+        self.selected_output = None
+        self.is_layer = False
+        self.user_edited_output = False
+
+        # --- Window ---
+        self.setWindowTitle(self.tr("Classify Data"))
+        self.resize(900, 600)
+        self.setMinimumWidth(850)
+
+        # --- Layout ---
+        main_layout = QHBoxLayout(self)
+
+        # --- Left Panel (Inputs, Parameters, and Buttons) ---
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(8)
+        left_layout.setAlignment(Qt.AlignTop)
+
+        # --- Input selection ---
+        left_layout.addWidget(QLabel(self.tr("LiDAR layer or file:")))
+        input_layout = QHBoxLayout()
+
+        self.input_combo = QComboBox()
+        self.input_combo.setEditable(False)
+        input_layout.addWidget(self.input_combo)
+
+        self.input_button = QPushButton(self.tr("..."))
+        self.input_button.setToolTip(self.tr("Select input file (.las / .laz)"))
+        self.input_button.setFixedWidth(28)
+        self.input_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        input_layout.addWidget(self.input_button)
+        left_layout.addLayout(input_layout)
+
+        # --- Output selection ---
+        left_layout.addWidget(QLabel(self.tr("Output file:")))
+        output_layout = QHBoxLayout()
+
+        self.output_edit = QLineEdit()
+        self.output_edit.setPlaceholderText(self.tr("Select output file path..."))
+        output_layout.addWidget(self.output_edit)
+
+        self.output_button = QPushButton(self.tr("..."))
+        self.output_button.setToolTip(self.tr("Select output file (.las / .laz)"))
+        self.output_button.setFixedWidth(28)
+        self.output_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        output_layout.addWidget(self.output_button)
+        left_layout.addLayout(output_layout)
+
+        # --- Parameters group ---
+        param_group = QGroupBox(self.tr("Vegetation Height Thresholds"))
+        param_layout = QFormLayout(param_group)
+        param_layout.setLabelAlignment(Qt.AlignRight)
+
+        # Low vegetation threshold
+        self.low_thresh_spin = QDoubleSpinBox()
+        self.low_thresh_spin.setRange(0.1, 100.0)
+        self.low_thresh_spin.setSingleStep(0.1)
+        self.low_thresh_spin.setDecimals(2)
+        self.low_thresh_spin.setValue(1.0)
+        self.low_thresh_spin.setSuffix(" m")
+        param_layout.addRow(self.tr("Low vegetation threshold:"), self.low_thresh_spin)
+
+        # High vegetation threshold
+        self.high_thresh_spin = QDoubleSpinBox()
+        self.high_thresh_spin.setRange(0.1, 100.0)
+        self.high_thresh_spin.setSingleStep(0.1)
+        self.high_thresh_spin.setDecimals(2)
+        self.high_thresh_spin.setValue(3.0)
+        self.high_thresh_spin.setSuffix(" m")
+        param_layout.addRow(self.tr("High vegetation threshold:"), self.high_thresh_spin)
+
+        self.low_thresh_spin.valueChanged.connect(self.validate_thresholds)
+        self.high_thresh_spin.valueChanged.connect(self.validate_thresholds)
+
+        left_layout.addWidget(param_group)
+
+        # --- Size classification group ---
+        size_group = QGroupBox(self.tr("Size Classification"))
+        size_layout = QFormLayout(size_group)
+        size_layout.setLabelAlignment(Qt.AlignRight)
+
+        # Height threshold for shrubs/trees
+        self.size_threshold_spin = QDoubleSpinBox()
+        self.size_threshold_spin.setRange(0.1, 100.0)
+        self.size_threshold_spin.setSingleStep(0.1)
+        self.size_threshold_spin.setDecimals(2)
+        self.size_threshold_spin.setValue(2.0)
+        self.size_threshold_spin.setSuffix(" m")
+        self.size_threshold_spin.setToolTip(self.tr("Trees >= this height, Shrubs < this height"))
+        size_layout.addRow(self.tr("Shrub/Tree threshold:"), self.size_threshold_spin)
+
+        left_layout.addWidget(size_group)
+
+        # --- Export options group ---
+        export_group = QGroupBox(self.tr("Export Options"))
+        export_layout = QVBoxLayout(export_group)
+
+        # Toggle all button
+        self.toggle_all_csv_btn = QPushButton(self.tr("Enable All CSV"))
+        self.toggle_all_csv_btn.setCheckable(True)
+        self.toggle_all_csv_btn.setChecked(False)
+        self.toggle_all_csv_btn.clicked.connect(self.toggle_all_csv)
+        export_layout.addWidget(self.toggle_all_csv_btn)
+
+        # CSV export checkboxes - all disabled by default
+        self.export_trees_check = QCheckBox(self.tr("Export trees to CSV"))
+        self.export_trees_check.setChecked(False)
+        self.export_trees_check.setToolTip(self.tr("Save detected trees to _metrics.csv"))
+        export_layout.addWidget(self.export_trees_check)
+
+        self.export_shrubs_check = QCheckBox(self.tr("Export shrubs to CSV"))
+        self.export_shrubs_check.setChecked(False)
+        self.export_shrubs_check.setToolTip(self.tr("Save detected shrubs to _shrubs.csv"))
+        export_layout.addWidget(self.export_shrubs_check)
+
+        self.export_grass_check = QCheckBox(self.tr("Export grass areas to CSV"))
+        self.export_grass_check.setChecked(False)
+        self.export_grass_check.setToolTip(self.tr("Save detected grass cell details to _grass_areas.csv (grass visualization always shown)"))
+        export_layout.addWidget(self.export_grass_check)
+
+        self.export_buildings_check = QCheckBox(self.tr("Export buildings to CSV"))
+        self.export_buildings_check.setChecked(False)
+        self.export_buildings_check.setToolTip(self.tr("Save detected buildings to _buildings.csv"))
+        export_layout.addWidget(self.export_buildings_check)
+
+        self.export_reclassified_check = QCheckBox(self.tr("Export reclassified LAZ"))
+        self.export_reclassified_check.setChecked(False)
+        self.export_reclassified_check.setToolTip(self.tr("Save a reclassified LAZ file with grass points changed from Class 2 to Class 3"))
+        export_layout.addWidget(self.export_reclassified_check)
+
+        left_layout.addWidget(export_group)
+
+        # --- Old export checkbox (hidden for compatibility) ---
+        self.export_csv_check = QCheckBox(self.tr("Export trees to CSV file"))
+        self.export_csv_check.setChecked(True)
+        self.export_csv_check.setVisible(False)
+        left_layout.addWidget(self.export_csv_check)
+
+        left_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
+
+        # --- OK / Cancel buttons ---
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        left_layout.addWidget(buttons)
+
+        # --- Right Panel (Description) ---
+        desc_box = QTextBrowser()
+        desc_box.setOpenExternalLinks(False)
+        desc_box.setFixedWidth(320)
+        desc_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        desc_box.setStyleSheet("""
+            QTextBrowser {
+                background-color: #fafafa;
+                border: 1px solid #dcdcdc;
+                padding: 10px;
+                border-radius: 6px;
+                font-family: "Segoe UI", sans-serif;
+                font-size: 10pt;
+            }
+        """)
+
+        title = self.tr("Data Classification")
+        intro = self.tr(
+            "This tool classifies LiDAR data into vegetation categories (trees, shrubs, grass) and buildings, extracting metrics and exporting results to CSV."
+        )
+        workflow = self.tr("Workflow:")
+        step1 = self.tr("Detects trees using CHM (Canopy Height Model) with Gaussian smoothing.")
+        step2 = self.tr("Detects shrubs using DBSCAN clustering on medium vegetation (Class 4).")
+        step3 = self.tr("Detects grass areas using ExG color index and existing Class 3 points.")
+        step4 = self.tr("Detects buildings using DBSCAN clustering on Class 6 points.")
+        step5 = self.tr("Optionally exports reclassified LAZ (grass Class 2 → Class 3).")
+        step6 = self.tr("Exports CSV files with coordinates and metrics for each category.")
+        note = self.tr("Each detected element includes coordinates (X, Y), height, crown diameter, area, " "point density, and RGB color for optimal export to FlamMap or Unity.")
+
+        desc_html = f"""
+            <div style="position: relative;">
+                <h3 style="margin-bottom:4px;">{title}</h3>
+                <p style="font-size:9.5pt; color:#444;">{intro}</p>
+                <hr style="border:none; border-top:1px solid #ccc; margin:6px 0;">
+                <h4 style="margin-bottom:2px;">{workflow}</h4>
+                <ul>
+                    <li>{step1}</li>
+                    <li>{step2}</li>
+                    <li>{step3}</li>
+                    <li>{step4}</li>
+                    <li>{step5}</li>
+                    <li>{step6}</li>
+                </ul>
+                <p style="margin-top:4px; font-size:9pt; color:#666;">{note}</p>
+            </div>
+        """
+        desc_box.setHtml(desc_html)
+
+        main_layout.addWidget(left_panel, stretch=3)
+        main_layout.addWidget(desc_box, stretch=2)
+
+        # --- Connections ---
+        self.populate_input_layers()
+        self.input_combo.currentIndexChanged.connect(self.on_input_changed)
+        self.input_button.clicked.connect(self.select_input_file)
+        self.output_button.clicked.connect(self.select_output_file)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+    # --- Layer & File Management ---
+    def populate_input_layers(self):
+        """Populate combo with loaded LiDAR layers."""
+        self.input_combo.clear()
+        layers = [
+            layer for layer in QgsProject.instance().mapLayers().values()
+            if isinstance(layer, QgsPointCloudLayer)
+        ]
+
+        if not layers:
+            self.selected_input = None
+            self.is_layer = False
+            return
+
+        for layer in layers:
+            crs = f" [{layer.crs().authid()}]" if layer.crs().isValid() else ""
+            self.input_combo.addItem(f"{layer.name()}{crs}", layer)
+
+        self.input_combo.setCurrentIndex(0)
+        self.on_input_changed(0)
+
+    def on_input_changed(self, index):
+        """Handle selection of input layer."""
+        layer = self.input_combo.itemData(index)
+        if isinstance(layer, QgsPointCloudLayer):
+            self.selected_input = layer.source()
+            self.is_layer = True
+        elif isinstance(layer, str):
+            self.selected_input = layer
+            self.is_layer = False
+        else:
+            return
+
+        if not self.user_edited_output:
+            self.update_default_output()
+
+    def update_default_output(self):
+        """Generate a default output file path."""
+        if not self.selected_input:
+            return
+        base_name = os.path.splitext(os.path.basename(self.selected_input))[0]
+        default_output = os.path.join(
+            os.path.dirname(self.selected_input),
+            base_name + "_classified_vegetation.laz"
+        )
+        self.output_edit.setText(default_output)
+        self.selected_output = default_output
+
+    def select_input_file(self):
+        """Prompt user to select an input LiDAR file."""
+        filename, _ = QFileDialog.getOpenFileName(
+            self,
+            self.tr("Select LiDAR File"),
+            "",
+            self.tr("LiDAR Files (*.las *.laz)")
+        )
+        if filename:
+            existing_index = self.input_combo.findData(filename)
+            if existing_index == -1:
+                self.input_combo.addItem(filename, filename)
+                self.input_combo.setCurrentIndex(self.input_combo.count() - 1)
+            else:
+                self.input_combo.setCurrentIndex(existing_index)
+            self.selected_input = filename
+            self.is_layer = False
+            self.user_edited_output = False
+            self.update_default_output()
+
+    def select_output_file(self):
+        """Prompt user to select output LiDAR file path."""
+        filename, _ = QFileDialog.getSaveFileName(
+            self,
+            self.tr("Save Classified Vegetation File"),
+            self.output_edit.text() or "",
+            self.tr("LiDAR Files (*.las *.laz)")
+        )
+        if filename:
+            self.output_edit.setText(filename)
+            self.selected_output = filename
+            self.user_edited_output = True
+
+    def get_values(self):
+        """Return threshold values (low_thresh, high_thresh)."""
+        low_thresh = self.low_thresh_spin.value()
+        high_thresh = self.high_thresh_spin.value()
+        return low_thresh, high_thresh
+
+    def get_input_output(self):
+        """Return (input_path, output_path)."""
+        return self.selected_input, self.output_edit.text().strip()
+
+    def get_export_csv(self):
+        """Return whether to export trees to CSV."""
+        return self.export_csv_check.isChecked()
+
+    def get_size_threshold(self):
+        """Return the height threshold for separating shrubs and trees."""
+        return self.size_threshold_spin.value()
+
+    def get_export_options(self):
+        """Return export options (trees, shrubs, grass, buildings, reclassified_laz)."""
+        return (self.export_trees_check.isChecked(),
+                self.export_shrubs_check.isChecked(),
+                self.export_grass_check.isChecked(),
+                self.export_buildings_check.isChecked(),
+                self.export_reclassified_check.isChecked())
+
+    def validate_thresholds(self):
+        low = self.low_thresh_spin.value()
+        high = self.high_thresh_spin.value()
+        if low >= high:
+            if self.sender() == self.low_thresh_spin:
+                self.high_thresh_spin.setValue(low + 0.01)
+            else:
+                self.low_thresh_spin.setValue(high - 0.01)
+
+    def toggle_all_csv(self):
+        """Toggle all CSV export checkboxes on/off."""
+        checked = self.toggle_all_csv_btn.isChecked()
+        self.export_trees_check.setChecked(checked)
+        self.export_shrubs_check.setChecked(checked)
+        self.export_grass_check.setChecked(checked)
+        self.export_buildings_check.setChecked(checked)
+        self.export_reclassified_check.setChecked(checked)
+        if checked:
+            self.toggle_all_csv_btn.setText(self.tr("Disable All CSV"))
+        else:
+            self.toggle_all_csv_btn.setText(self.tr("Enable All CSV"))
+

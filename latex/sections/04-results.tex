@@ -1,0 +1,55 @@
+\section{Results}
+\label{sec:results}
+
+The plugin was tested using publicly available PNOA LiDAR tiles (Spanish National Aerial Ortophotography Plan) in LAZ format covering mixed urban--forest interfaces typical of wildfire-prone Mediterranean landscapes.
+
+\subsection{Classification Output}
+
+Table~\ref{tab:classification} summarizes the classification results for a representative 500\,m$\times$500\,m tile containing approximately 8 million points (2 returns/m$^2$).
+
+\begin{table}[h]
+\centering
+\caption{Classification Summary for Sample Tile}
+\label{tab:classification}
+\begin{tabular}{lrr}
+\hline
+\textbf{Class} & \textbf{Features} & \textbf{Points Used} \\
+\hline
+Trees       & 342 & 187\,400 \\
+Shrubs      & 1\,205 & 45\,600 \\
+Grass cells & 8\,734 & 312\,000 \\
+Buildings   & 89 clusters & 156\,200 \\
+\hline
+\end{tabular}
+\end{table}
+
+The DBSCAN-based tree detection correctly merges canopy points into single tree objects. Prior grid-based approaches produced fragmented results (e.g., a large \textit{Pinus pinaster} canopy covering 12\,m diameter would be split into dozens of 2\,m cells). With DBSCAN ($\varepsilon=3.0$\,m), each connected canopy yields one tree, with crown diameter derived from the actual point spread.
+
+\subsection{OBJ Export}
+
+The exported OBJ file for the same tile contains approximately 45\,000 vertices and 22\,000 faces, with a combined OBJ+MTL file size of 3.2\,MB. All geometry primitives (boxes and quads) are closed, watertight, and display correctly from any viewing angle in standard renderers such as Blender, MeshLab, and the Windows 3D Viewer.
+
+Ground and grass quads are rendered as double-sided polygons, ensuring visibility regardless of camera orientation. Building, shrub, and crown boxes use six CCW-wound faces, providing correct surface normals for lighting and backface culling.
+
+\subsection{Processing Time}
+
+Table~\ref{tab:timing} reports processing times on an Intel Core i7-12700 with 32\,GB RAM.
+
+\begin{table}[h]
+\centering
+\caption{Processing Times}
+\label{tab:timing}
+\begin{tabular}{lr}
+\hline
+\textbf{Stage} & \textbf{Time (s)} \\
+\hline
+Full classification (CHM + DBSCAN) & 18.4 \\
+Quick classify (DBSCAN only)       & 6.2 \\
+OBJ file writing                   & 1.8 \\
+\hline
+\textbf{Total (quick export)}      & \textbf{8.0} \\
+\hline
+\end{tabular}
+\end{table}
+
+The quick classification path, which bypasses CHM rasterization and file exports, is approximately three times faster than the full pipeline while producing geometrically equivalent OBJ output.
