@@ -59,7 +59,11 @@
   "Coordinates (X,Y):": "Coordenadas (X,Y):",
   "Add Point": "Añadir Punto",
   "Invalid Coordinates": "Coordenadas Inválidas",
+<<<<<<< Updated upstream
   "Please enter coordinates in the format X,Y": "Por favor introduzca coordenadas en formato X,Y",
+=======
+  "Please enter coordinates in the format X,Y": "Por favor, introduzca coordenadas en formato X,Y",
+>>>>>>> Stashed changes
   "Exporting to FlamMap GeoTIFF in the background": "Exportando a FlamMap GeoTIFF en segundo plano",
   "FlamMap Export Complete": "Exportación FlamMap Completada",
   "GeoTIFF files saved to": "Archivos GeoTIFF guardados en",
@@ -75,6 +79,7 @@
   "Selected file:": "Archivo seleccionado:",
   "Browse for LAS/LAZ file...": "Buscar archivo LAS/LAZ...",
   "Elements to Include": "Elementos a Incluir",
+<<<<<<< Updated upstream
   "Include ground plane": "Incluir plano del terreno",
   "Include trees (trunk + crown)": "Incluir árboles (tronco + copa)",
   "Include shrubs (cubes)": "Incluir arbustos (cubos)",
@@ -82,6 +87,15 @@
   "Include buildings (boxes)": "Incluir edificios (cajas)",
   "Include roads (flat planes)": "Incluir carreteras (planos)",
   "Include terrain elevation": "Incluir elevación del terreno",
+=======
+  "Ground plane": "Plano del terreno",
+  "Trees (trunk + crown)": "Árboles (tronco + copa)",
+  "Shrubs (cubes)": "Arbustos (cubos)",
+  "Grass (flat squares)": "Césped (cuadrados planos)",
+  "Buildings (boxes)": "Edificios (cajas)",
+  "Roads (flat planes)": "Carreteras (planos)",
+  "Terrain elevation": "Elevación del terreno",
+>>>>>>> Stashed changes
   "Generate 3D terrain mesh from ground elevation data (mountains, hills, slopes)": "Generar malla 3D del terreno a partir de datos de elevación del suelo (montañas, colinas, pendientes)",
   "Generates 3D geometry for each element type: trunks and crowns for trees, cubes for shrubs, inclined quads for grass, extruded boxes for buildings, and a terrain mesh with real elevation data.": "Genera geometría 3D para cada tipo de elemento: troncos y copas para árboles, cubos para arbustos, planos inclinados para césped, cajas extruidas para edificios, y una malla de terreno con datos reales de elevación.",
   "Export Configuration": "Configuración de Exportación",
@@ -90,6 +104,7 @@
   "Ground padding (m):": "Margen del terreno (m):",
   "Extra margin around all elements for the ground plane": "Margen extra alrededor de todos los elementos para el plano del terreno",
   "No Input": "Sin Entrada",
+<<<<<<< Updated upstream
   "Please select a LAS/LAZ file or use an imported layer.": "Por favor seleccione un archivo LAS/LAZ o use una capa importada.",
   "Classifying LAS file for OBJ export...": "Clasificando archivo LAS para exportación OBJ...",
   "Exporting 3D scene to OBJ in the background...": "Exportando escena 3D a OBJ en segundo plano...",
@@ -101,6 +116,19 @@
   "No Output Selected": "Sin Salida Seleccionada",
   "Please specify an output file path.": "Por favor especifique una ruta de archivo de salida.",
   "Please specify an output DEM file path.": "Por favor especifique una ruta de archivo MDE de salida.",
+=======
+  "Please select a LAS/LAZ file or use an imported layer.": "Por favor, seleccione un archivo LAS/LAZ o use una capa importada.",
+  "Classifying LAS file for OBJ export...": "Clasificando archivo LAS para exportación OBJ...",
+  "Exporting 3D scene to OBJ in the background...": "Exportando escena 3D a OBJ en segundo plano...",
+  "Please select a LAS/LAZ file.": "Por favor, seleccione un archivo LAS/LAZ.",
+
+  "Task Started": "Tarea Iniciada",
+  "No Input Selected": "Sin Entrada Seleccionada",
+  "Please select a LiDAR layer or file.": "Por favor, seleccione una capa o archivo LiDAR.",
+  "No Output Selected": "Sin Salida Seleccionada",
+  "Please specify an output file path.": "Por favor, especifique una ruta de archivo de salida.",
+  "Please specify an output DEM file path.": "Por favor, especifique una ruta de archivo MDE de salida.",
+>>>>>>> Stashed changes
   "LiDAR Files (*.las *.laz)": "Archivos LiDAR (*.las *.laz)",
   "Export trees to CSV file": "Exportar árboles a archivo CSV",
 
@@ -117,5 +145,11 @@
   "Output OBJ File": "Archivo OBJ de salida",
   "Select output OBJ file...": "Seleccionar archivo OBJ de salida...",
   "Save OBJ File": "Guardar archivo OBJ",
+<<<<<<< Updated upstream
   "OBJ Files (*.obj)": "Archivos OBJ (*.obj)"
+=======
+  "OBJ Files (*.obj)": "Archivos OBJ (*.obj)",
+
+  "Scenarios generated in": "Escenarios generados en"
+>>>>>>> Stashed changes
 }

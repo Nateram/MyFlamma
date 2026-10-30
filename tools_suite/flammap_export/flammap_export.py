@@ -450,7 +450,11 @@ class FlamMapExportTask(QgsTask):
 def flammap_export(self):
     # Step 1: Select input/output and parameters via dialog
     dialog = FlamMapExportDialog(self.iface.mainWindow(), translator=self.tr, iface=self.iface)
+<<<<<<< Updated upstream
     if dialog.exec_() != QDialog.Accepted:
+=======
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+>>>>>>> Stashed changes
         return
 
     input_filename, output_filename = dialog.get_input_output()

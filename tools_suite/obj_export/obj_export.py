@@ -646,7 +646,11 @@ def export_to_obj(plugin_ref):
     # Always show dialog with file selector
     dlg = ObjExportDialog(plugin_ref.iface.mainWindow(), translator=plugin_ref.tr, iface=plugin_ref.iface)
 
+<<<<<<< Updated upstream
     if dlg.exec_() != ObjExportDialog.Accepted:
+=======
+    if dlg.exec() != ObjExportDialog.DialogCode.Accepted:
+>>>>>>> Stashed changes
         return
 
     input_file = dlg.get_input_file()

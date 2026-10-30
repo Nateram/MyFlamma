@@ -1318,7 +1318,11 @@ class VegetationClassificationCHMTask(QgsTask):
 def classify_vegetation(self):
     # 1. Abrir diálogo
     dialog = VegetationClassificationDialog(self.iface.mainWindow(), translator=self.tr)
+<<<<<<< Updated upstream
     if dialog.exec_() != QDialog.Accepted:
+=======
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+>>>>>>> Stashed changes
         return
 
     input_filename, output_filename = dialog.get_input_output()
