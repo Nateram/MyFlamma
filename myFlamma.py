@@ -65,15 +65,9 @@ class MyFlammaPlugin:
             menubar.addMenu(self.menu)
 
         actions = [
-<<<<<<< Updated upstream
-            ("vegetation.png", self.tr("Classify Data"), self.vegetation_classification_chm),
-            ("fire.png", self.tr("Export to FlamMap"), self.export_flammap),
-            ("obj.png", self.tr("Export to OBJ"), self.export_obj),
-=======
             ("veg_classification.png", self.tr("Classify Data"), self.vegetation_classification_chm),
             ("flammap_export.png", self.tr("Export to FlamMap"), self.export_flammap),
             ("obj_export.png", self.tr("Export to OBJ"), self.export_obj),
->>>>>>> Stashed changes
         ]
 
         self.actions = []

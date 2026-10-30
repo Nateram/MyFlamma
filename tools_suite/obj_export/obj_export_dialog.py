@@ -35,11 +35,7 @@ class ObjExportDialog(QDialog):
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(8)
-<<<<<<< Updated upstream
-        left_layout.setAlignment(Qt.AlignTop)
-=======
         left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
->>>>>>> Stashed changes
 
         # --- Input file ---
         left_layout.addWidget(QLabel(self.tr_func("LiDAR layer or file:")))
@@ -68,11 +64,7 @@ class ObjExportDialog(QDialog):
 
         btn_output = QPushButton(self.tr_func("..."))
         btn_output.setFixedWidth(28)
-<<<<<<< Updated upstream
-        btn_output.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-=======
         btn_output.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
->>>>>>> Stashed changes
         btn_output.clicked.connect(self._browse_output)
         output_layout.addWidget(btn_output)
 
@@ -88,29 +80,6 @@ class ObjExportDialog(QDialog):
         opts_group = QGroupBox(self.tr_func("Elements to Include"))
         opts_layout = QVBoxLayout()
 
-<<<<<<< Updated upstream
-        self.check_ground = QCheckBox(self.tr_func("Include ground plane"))
-        self.check_ground.setChecked(True)
-        opts_layout.addWidget(self.check_ground)
-
-        self.check_trees = QCheckBox(self.tr_func("Include trees (trunk + crown)"))
-        self.check_trees.setChecked(True)
-        opts_layout.addWidget(self.check_trees)
-
-        self.check_shrubs = QCheckBox(self.tr_func("Include shrubs (cubes)"))
-        self.check_shrubs.setChecked(True)
-        opts_layout.addWidget(self.check_shrubs)
-
-        self.check_grass = QCheckBox(self.tr_func("Include grass (flat squares)"))
-        self.check_grass.setChecked(True)
-        opts_layout.addWidget(self.check_grass)
-
-        self.check_buildings = QCheckBox(self.tr_func("Include buildings (boxes)"))
-        self.check_buildings.setChecked(True)
-        opts_layout.addWidget(self.check_buildings)
-
-        self.check_terrain = QCheckBox(self.tr_func("Include terrain elevation"))
-=======
         self.check_ground = QCheckBox(self.tr_func("Ground plane"))
         self.check_ground.setChecked(True)
         opts_layout.addWidget(self.check_ground)
@@ -132,7 +101,6 @@ class ObjExportDialog(QDialog):
         opts_layout.addWidget(self.check_buildings)
 
         self.check_terrain = QCheckBox(self.tr_func("Terrain elevation"))
->>>>>>> Stashed changes
         self.check_terrain.setChecked(True)
         self.check_terrain.setToolTip(self.tr_func("Generate 3D terrain mesh from ground elevation data (mountains, hills, slopes)"))
         opts_layout.addWidget(self.check_terrain)
@@ -169,17 +137,10 @@ class ObjExportDialog(QDialog):
         config_group.setLayout(config_layout)
         left_layout.addWidget(config_group)
 
-<<<<<<< Updated upstream
-        left_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
-
-        # --- OK / Cancel buttons ---
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-=======
         left_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         # --- OK / Cancel buttons ---
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
->>>>>>> Stashed changes
         buttons.accepted.connect(self._validate_and_accept)
         buttons.rejected.connect(self.reject)
         left_layout.addWidget(buttons)
@@ -188,11 +149,7 @@ class ObjExportDialog(QDialog):
         desc_box = QTextBrowser()
         desc_box.setOpenExternalLinks(False)
         desc_box.setFixedWidth(320)
-<<<<<<< Updated upstream
-        desc_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-=======
         desc_box.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
->>>>>>> Stashed changes
         desc_box.setStyleSheet("""
             QTextBrowser {
                 background-color: #fafafa;

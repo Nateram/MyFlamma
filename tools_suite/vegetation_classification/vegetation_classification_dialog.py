@@ -27,11 +27,7 @@ class VegetationClassificationDialog(QDialog):
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(8)
-<<<<<<< Updated upstream
-        left_layout.setAlignment(Qt.AlignTop)
-=======
         left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
->>>>>>> Stashed changes
 
         # --- Input selection ---
         left_layout.addWidget(QLabel(self.tr("LiDAR layer or file:")))
@@ -44,11 +40,7 @@ class VegetationClassificationDialog(QDialog):
         self.input_button = QPushButton(self.tr("..."))
         self.input_button.setToolTip(self.tr("Select input file (.las / .laz)"))
         self.input_button.setFixedWidth(28)
-<<<<<<< Updated upstream
-        self.input_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-=======
         self.input_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
->>>>>>> Stashed changes
         input_layout.addWidget(self.input_button)
         left_layout.addLayout(input_layout)
 
@@ -63,22 +55,14 @@ class VegetationClassificationDialog(QDialog):
         self.output_button = QPushButton(self.tr("..."))
         self.output_button.setToolTip(self.tr("Select output file (.las / .laz)"))
         self.output_button.setFixedWidth(28)
-<<<<<<< Updated upstream
-        self.output_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-=======
         self.output_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
->>>>>>> Stashed changes
         output_layout.addWidget(self.output_button)
         left_layout.addLayout(output_layout)
 
         # --- Parameters group ---
         param_group = QGroupBox(self.tr("Vegetation Height Thresholds"))
         param_layout = QFormLayout(param_group)
-<<<<<<< Updated upstream
-        param_layout.setLabelAlignment(Qt.AlignRight)
-=======
         param_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
->>>>>>> Stashed changes
 
         # Low vegetation threshold
         self.low_thresh_spin = QDoubleSpinBox()
@@ -106,11 +90,7 @@ class VegetationClassificationDialog(QDialog):
         # --- Size classification group ---
         size_group = QGroupBox(self.tr("Size Classification"))
         size_layout = QFormLayout(size_group)
-<<<<<<< Updated upstream
-        size_layout.setLabelAlignment(Qt.AlignRight)
-=======
         size_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
->>>>>>> Stashed changes
 
         # Height threshold for shrubs/trees
         self.size_threshold_spin = QDoubleSpinBox()
@@ -169,28 +149,17 @@ class VegetationClassificationDialog(QDialog):
         self.export_csv_check.setVisible(False)
         left_layout.addWidget(self.export_csv_check)
 
-<<<<<<< Updated upstream
-        left_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Minimum, QSizePolicy.Expanding))
-
-        # --- OK / Cancel buttons ---
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-=======
         left_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         # --- OK / Cancel buttons ---
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
->>>>>>> Stashed changes
         left_layout.addWidget(buttons)
 
         # --- Right Panel (Description) ---
         desc_box = QTextBrowser()
         desc_box.setOpenExternalLinks(False)
         desc_box.setFixedWidth(320)
-<<<<<<< Updated upstream
-        desc_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-=======
         desc_box.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
->>>>>>> Stashed changes
         desc_box.setStyleSheet("""
             QTextBrowser {
                 background-color: #fafafa;

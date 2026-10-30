@@ -63,15 +63,6 @@
   "Selected file:": "Selected file:",
   "Browse for LAS/LAZ file...": "Browse for LAS/LAZ file...",
   "Elements to Include": "Elements to Include",
-<<<<<<< Updated upstream
-  "Include ground plane": "Include ground plane",
-  "Include trees (trunk + crown)": "Include trees (trunk + crown)",
-  "Include shrubs (cubes)": "Include shrubs (cubes)",
-  "Include grass (flat squares)": "Include grass (flat squares)",
-  "Include buildings (boxes)": "Include buildings (boxes)",
-  "Include roads (flat planes)": "Include roads (flat planes)",
-  "Include terrain elevation": "Include terrain elevation",
-=======
   "Ground plane": "Ground plane",
   "Trees (trunk + crown)": "Trees (trunk + crown)",
   "Shrubs (cubes)": "Shrubs (cubes)",
@@ -79,7 +70,6 @@
   "Buildings (boxes)": "Buildings (boxes)",
   "Roads (flat planes)": "Roads (flat planes)",
   "Terrain elevation": "Terrain elevation",
->>>>>>> Stashed changes
   "Generate 3D terrain mesh from ground elevation data (mountains, hills, slopes)": "Generate 3D terrain mesh from ground elevation data (mountains, hills, slopes)",
   "Generates 3D geometry for each element type: trunks and crowns for trees, cubes for shrubs, inclined quads for grass, extruded boxes for buildings, and a terrain mesh with real elevation data.": "Generates 3D geometry for each element type: trunks and crowns for trees, cubes for shrubs, inclined quads for grass, extruded boxes for buildings, and a terrain mesh with real elevation data.",
   "Export Configuration": "Export Configuration",
@@ -106,11 +96,7 @@
   "Output OBJ File": "Output OBJ File",
   "Select output OBJ file...": "Select output OBJ file...",
   "Save OBJ File": "Save OBJ File",
-<<<<<<< Updated upstream
-  "OBJ Files (*.obj)": "OBJ Files (*.obj)"
-=======
   "OBJ Files (*.obj)": "OBJ Files (*.obj)",
 
   "Scenarios generated in": "Scenarios generated in"
->>>>>>> Stashed changes
 }
