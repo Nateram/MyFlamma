@@ -21,13 +21,11 @@
   "No Output Selected": "No Output Selected",
   "Please specify an output file path.": "Please specify an output file path.",
 
-
+  
   "Export Parameters": "Export Parameters",
   "Cell resolution (m):": "Cell resolution (m):",
-  "Generate Simulation Scenarios (Ignition & Weather)": "Generate Simulation Scenarios (Ignition & Weather)",
-  "Creates GeoTIFF files + ignition points (.shp) and weather files (.fms) in a 'scenarios' subfolder": "Creates GeoTIFF files + ignition points (.shp) and weather files (.fms) in a 'scenarios' subfolder",
-  "Generate Only Scenarios and Ignition Points": "Generate Only Scenarios and Ignition Points",
-  "Creates only ignition points (.shp) and weather files (.fms) in a 'scenarios' subfolder, without GeoTIFF files": "Creates only ignition points (.shp) and weather files (.fms) in a 'scenarios' subfolder, without GeoTIFF files",
+  "Include GeoTIFF Files": "Include GeoTIFF Files",
+  "If unchecked, only ignition points (.shp) and weather files (.fms) will be created in a 'scenarios' subfolder": "If unchecked, only ignition points (.shp) and weather files (.fms) will be created in a 'scenarios' subfolder",
   "This tool exports LiDAR point cloud data to a multi-band GeoTIFF file compatible with FlamMap fire simulation software.": "This tool exports LiDAR point cloud data to a multi-band GeoTIFF file compatible with FlamMap fire simulation software.",
   "Reads the LiDAR file and extracts coordinates and classifications.": "Reads the LiDAR file and extracts coordinates and classifications.",
   "Rasterizes the data into a grid at the specified resolution.": "Rasterizes the data into a grid at the specified resolution.",

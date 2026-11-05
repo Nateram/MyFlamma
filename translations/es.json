@@ -46,10 +46,10 @@
   "FlamMap GeoTIFF Export": "Exportación GeoTIFF para FlamMap",
   "Export Parameters": "Parámetros de Exportación",
   "Cell resolution (m):": "Resolución de celda (m):",
-  "Generate Simulation Scenarios (Ignition & Weather)": "Generar Escenarios de Simulación (Ignición y Clima)",
-  "Creates GeoTIFF files + ignition points (.shp) and weather files (.fms) in a 'scenarios' subfolder": "Crea archivos GeoTIFF + puntos de ignición (.shp) y archivos climáticos (.fms) en una subcarpeta 'scenarios'",
-  "Generate Only Scenarios and Ignition Points": "Generar Solo Escenarios y Puntos de Ignición",
-  "Creates only ignition points (.shp) and weather files (.fms) in a 'scenarios' subfolder, without GeoTIFF files": "Crea solo puntos de ignición (.shp) y archivos climáticos (.fms) en una subcarpeta 'scenarios', sin archivos GeoTIFF",
+
+  "Include GeoTIFF Files": "Incluir archivos GeoTIFF",
+  "If unchecked, only ignition points (.shp) and weather files (.fms) will be created in a 'scenarios' subfolder": "Si no se marca, solo se crearán puntos de ignición (.shp) y archivos de clima (.fms) en una subcarpeta 'scenarios'",
+
   "This tool exports LiDAR point cloud data to a multi-band GeoTIFF file compatible with FlamMap fire simulation software.": "Esta herramienta exporta datos de nube de puntos LiDAR a un archivo GeoTIFF multibanda compatible con el software de simulación de incendios FlamMap.",
   "Reads the LiDAR file and extracts coordinates and classifications.": "Lee el archivo LiDAR y extrae coordenadas y clasificaciones.",
   "Rasterizes the data into a grid at the specified resolution.": "Rasteriza los datos en una cuadrícula con la resolución especificada.",
