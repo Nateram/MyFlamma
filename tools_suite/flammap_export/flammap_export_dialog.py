@@ -1,7 +1,6 @@
-from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton,QDialogButtonBox, QFileDialog, QLineEdit, QSizePolicy, QTextBrowser, QWidget, QSpacerItem, QGroupBox, QFormLayout, QDoubleSpinBox, QCheckBox, QListWidget, QListWidgetItem, QAction, QMessageBox
+from qgis.PyQt.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton,QDialogButtonBox, QFileDialog, QLineEdit, QSizePolicy, QTextBrowser, QWidget, QSpacerItem, QGroupBox, QFormLayout, QDoubleSpinBox, QCheckBox, QMessageBox
 from qgis.PyQt.QtCore import Qt, QSettings
 from qgis.core import QgsProject, QgsPointCloudLayer
-from qgis.gui import QgsMapTool
 import os
 import functools
 

@@ -2,7 +2,6 @@ import os
 import numpy as np
 import traceback
 import csv
-import datetime
 
 # --- QGIS y PyQt ---
 from qgis.core import (
