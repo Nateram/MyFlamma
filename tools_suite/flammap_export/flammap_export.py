@@ -30,15 +30,14 @@ from .flammap_export_dialog import FlamMapExportDialog
 class FlamMapExportTask(QgsTask):
     """Export LiDAR to FlamMap GeoTIFF in a background thread"""
 
-    def __init__(self, description, input_filename, output_filename, resolution, parent, translator, generate_scenarios=False, ignition_points=None, generate_only_scenarios=False):
+    def __init__(self, description, input_filename, output_filename, resolution, parent, translator, generate_geotiff=True, ignition_points=None):
         super().__init__(description, QgsTask.CanCancel)
         self.input_filename = input_filename
         self.output_filename = output_filename
         self.resolution = resolution
-        self.generate_scenarios = generate_scenarios
+        self.generate_geotiff = generate_geotiff
         self.ignition_points = ignition_points if ignition_points else []
-        self.generate_only_scenarios = generate_only_scenarios
-        self.should_generate_scenarios = self.generate_scenarios or self.generate_only_scenarios or (self.ignition_points and len(self.ignition_points) > 0)
+        self.should_generate_scenarios = (self.ignition_points and len(self.ignition_points) > 0)
         self.parent = parent
         self.exception = None
         self.tr = translator
@@ -274,7 +273,7 @@ class FlamMapExportTask(QgsTask):
                 raise Exception(f"No write permission in directory: {flammap_dir}")
 
             # Step 8: Create individual GeoTIFF files
-            if not self.generate_only_scenarios:
+            if self.generate_geotiff:
                 driver = gdal.GetDriverByName('GTiff')
 
                 # Set geotransform
@@ -423,9 +422,8 @@ class FlamMapExportTask(QgsTask):
 
     def finished(self, result):
         if result:
-            if self.generate_only_scenarios:
-                msg = f"{self.tr('Scenarios generated in')}:\n{os.path.join(os.path.dirname(self.output_filename), 'flammap_output', 'scenarios')}"
-            else:
+            msg = f"{self.tr('Scenarios generated in')}:\n{os.path.join(os.path.dirname(self.output_filename), 'flammap_output', 'scenarios')}"
+            if self.generate_geotiff:
                 msg = f"{self.tr('GeoTIFF files saved to')}:\n{os.path.join(os.path.dirname(self.output_filename), 'flammap_output')}"
                 if self.should_generate_scenarios:
                      msg += f"\n\n{self.tr('Scenarios generated in')}:\n.../flammap_output/scenarios/"
@@ -437,7 +435,7 @@ class FlamMapExportTask(QgsTask):
             )
         else:
             msg = f"{self.tr('An error occurred')}: {self.exception}" if self.exception else self.tr("Export failed")
-            QgsMessageLog.logMessage(msg, "MyLiDAR", Qgis.Critical)
+            QgsMessageLog.logMessage(msg, "MyFlamma", Qgis.Critical)
             QMessageBox.critical(self.parent.iface.mainWindow(), self.tr("Error Exporting to FlamMap"), msg)
 
         if self in self.parent.running_tasks:
@@ -471,13 +469,12 @@ def flammap_export(self):
         return
 
     resolution = dialog.get_resolution()
-    generate_scenarios = dialog.get_generate_scenarios()
+    generate_geotiff = dialog.get_include_geotiff()
     ignition_points = dialog.get_ignition_points()
-    generate_only_scenarios = dialog.get_generate_only_scenarios()
 
     # Step 2: Create and run the background task
     task_description = f"{self.tr('Exporting to FlamMap GeoTIFF from')} {os.path.basename(input_filename)}"
-    task = FlamMapExportTask(task_description, input_filename, output_filename, resolution, self, self.tr, generate_scenarios, ignition_points, generate_only_scenarios)
+    task = FlamMapExportTask(task_description, input_filename, output_filename, resolution, self, self.tr, generate_geotiff, ignition_points)
 
     self.running_tasks.append(task)
     QgsApplication.taskManager().addTask(task)

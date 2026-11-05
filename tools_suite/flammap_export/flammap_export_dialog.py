@@ -79,17 +79,11 @@ class FlamMapExportDialog(QDialog):
         self.resolution_spin.setSuffix(" m")
         param_layout.addRow(self.tr("Cell resolution (m):"), self.resolution_spin)
 
-        # Generate scenarios checkbox
-        self.scenarios_checkbox = QCheckBox(self.tr("Generate Simulation Scenarios (Ignition & Weather)"))
-        self.scenarios_checkbox.setChecked(False)
-        self.scenarios_checkbox.setToolTip(self.tr("Creates GeoTIFF files + ignition points (.shp) and weather files (.fms) in a 'scenarios' subfolder"))
-        param_layout.addRow(self.scenarios_checkbox)
-
-        # Generate only scenarios checkbox
-        self.only_scenarios_checkbox = QCheckBox(self.tr("Generate Only Scenarios and Ignition Points"))
-        self.only_scenarios_checkbox.setChecked(False)
-        self.only_scenarios_checkbox.setToolTip(self.tr("Creates only ignition points (.shp) and weather files (.fms) in a 'scenarios' subfolder, without GeoTIFF files"))
-        param_layout.addRow(self.only_scenarios_checkbox)
+        # Include GeoTIFF files checkbox
+        self.geotiff_checkbox = QCheckBox(self.tr("Include GeoTIFF Files"))
+        self.geotiff_checkbox.setChecked(True)
+        self.geotiff_checkbox.setToolTip(self.tr("If unchecked, only ignition points (.shp) and weather files (.fms) will be created in a 'scenarios' subfolder"))
+        param_layout.addRow(self.geotiff_checkbox)
 
         left_layout.addWidget(param_group)
 
@@ -270,13 +264,9 @@ class FlamMapExportDialog(QDialog):
         """Return cell resolution value."""
         return self.resolution_spin.value()
 
-    def get_generate_scenarios(self):
-        """Return whether to generate simulation scenarios."""
-        return self.scenarios_checkbox.isChecked()
-
-    def get_generate_only_scenarios(self):
-        """Return whether to generate only scenarios and ignition points."""
-        return self.only_scenarios_checkbox.isChecked()
+    def get_include_geotiff(self):
+        """Return whether to include GeoTIFF files in the output."""
+        return self.geotiff_checkbox.isChecked()
 
     def add_point_from_text(self):
         text = self.coord_edit.text().strip()
@@ -291,7 +281,7 @@ class FlamMapExportDialog(QDialog):
 
     def add_ignition_point(self, x, y):
         self.ignition_points.append((x, y))
-        self.settings.setValue("MyLiDAR/ignition_points", self.ignition_points)
+        self.settings.setValue("MyFlamma/ignition_points", self.ignition_points)
         self.update_ignition_list()
 
     def update_ignition_list(self):
@@ -321,7 +311,7 @@ class FlamMapExportDialog(QDialog):
     def remove_point(self, idx):
         if 0 <= idx < len(self.ignition_points):
             del self.ignition_points[idx]
-            self.settings.setValue("MyLiDAR/ignition_points", self.ignition_points)
+            self.settings.setValue("MyFlamma/ignition_points", self.ignition_points)
             self.update_ignition_list()
 
     def get_ignition_points(self):

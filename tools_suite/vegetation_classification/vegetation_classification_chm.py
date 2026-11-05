@@ -345,7 +345,7 @@ class VegetationClassificationCHMTask(QgsTask):
             med_z = z[med_veg_mask]
             med_color_indices = np.arange(len(x))[med_veg_mask]
             
-            QgsMessageLog.logMessage(f"DEBUG: Puntos clase 4 encontrados: {len(med_x)}", "MyLiDAR", Qgis.Info)
+            QgsMessageLog.logMessage(f"DEBUG: Puntos clase 4 encontrados: {len(med_x)}", "MyFlamma", Qgis.Info)
             
             med_r = red[med_veg_mask] if has_color else None
             med_g = green[med_veg_mask] if has_color else None
@@ -371,7 +371,7 @@ class VegetationClassificationCHMTask(QgsTask):
                 
                 num_clusters = len(set(labels)) - (1 if -1 in labels else 0)
                 num_noise = list(labels).count(-1)
-                QgsMessageLog.logMessage(f"DEBUG: Clusters encontrados: {num_clusters}, Ruido: {num_noise}", "MyLiDAR", Qgis.Info)
+                QgsMessageLog.logMessage(f"DEBUG: Clusters encontrados: {num_clusters}, Ruido: {num_noise}", "MyFlamma", Qgis.Info)
                 
                 # UN PUNTO por cluster (centroide)
                 unique_labels = set(labels)
@@ -460,7 +460,7 @@ class VegetationClassificationCHMTask(QgsTask):
                         grass_g_filt = grass_g[valid_grass_mask]
                         grass_b_filt = grass_b[valid_grass_mask]
                         
-                        QgsMessageLog.logMessage(f"DEBUG: Puntos de grass candidatos (Clase 3 existentes + Clase 2 por ExG): {len(grass_x_filt)}", "MyLiDAR", Qgis.Info)
+                        QgsMessageLog.logMessage(f"DEBUG: Puntos de grass candidatos (Clase 3 existentes + Clase 2 por ExG): {len(grass_x_filt)}", "MyFlamma", Qgis.Info)
                         
                         # CLUSTERING: Agrupar puntos de grass cercanos
                         from sklearn.cluster import DBSCAN
@@ -571,7 +571,7 @@ class VegetationClassificationCHMTask(QgsTask):
                 labels_build = clustering_build.labels_
                 
                 num_build_clusters = len(set(labels_build)) - (1 if -1 in labels_build else 0)
-                QgsMessageLog.logMessage(f"DEBUG: Edificios detectados (clusters): {num_build_clusters}", "MyLiDAR", Qgis.Info)
+                QgsMessageLog.logMessage(f"DEBUG: Edificios detectados (clusters): {num_build_clusters}", "MyFlamma", Qgis.Info)
                 
                 unique_labels_build = set(labels_build)
                 for cluster_id in unique_labels_build:
@@ -760,16 +760,16 @@ class VegetationClassificationCHMTask(QgsTask):
                     self.reclassified_laz_path = las_output
                     
                     num_reclassified = len(self.reclassified_indices)
-                    QgsMessageLog.logMessage(f"LAZ Reclasificado guardado: {las_output} ({num_reclassified} puntos de Clase 2→3)", "MyLiDAR", Qgis.Success)
+                    QgsMessageLog.logMessage(f"LAZ Reclasificado guardado: {las_output} ({num_reclassified} puntos de Clase 2→3)", "MyFlamma", Qgis.Success)
                 except Exception as e:
-                    QgsMessageLog.logMessage(f"Error escribiendo LAZ reclasificado: {str(e)}", "MyLiDAR", Qgis.Warning)
+                    QgsMessageLog.logMessage(f"Error escribiendo LAZ reclasificado: {str(e)}", "MyFlamma", Qgis.Warning)
             
             self.setProgress(100)
             return True
 
         except Exception as e:
             self.exception = e
-            QgsMessageLog.logMessage(str(traceback.format_exc()), "MyLiDAR", Qgis.Critical)
+            QgsMessageLog.logMessage(str(traceback.format_exc()), "MyFlamma", Qgis.Critical)
             return False
 
     def _create_grass_polygon(self, cluster_indices, grass_x, grass_y, grass_r, grass_g, grass_b, build_tree, grass_detected):
@@ -963,7 +963,7 @@ class VegetationClassificationCHMTask(QgsTask):
                     'Color_RGB': f['color_rgb']
                 })
         
-        QgsMessageLog.logMessage(f"CSV Exportado: {self.csv_path}", "MyLiDAR", Qgis.Success)
+        QgsMessageLog.logMessage(f"CSV Exportado: {self.csv_path}", "MyFlamma", Qgis.Success)
 
     def _export_shrubs_to_csv(self, features):
         """Exporta arbustos a CSV"""
@@ -994,7 +994,7 @@ class VegetationClassificationCHMTask(QgsTask):
                     'Color_RGB': f['color_rgb']
                 })
         
-        QgsMessageLog.logMessage(f"CSV Arbustos Exportado: {self.csv_shrubs_path}", "MyLiDAR", Qgis.Success)
+        QgsMessageLog.logMessage(f"CSV Arbustos Exportado: {self.csv_shrubs_path}", "MyFlamma", Qgis.Success)
 
     def _export_grass_to_csv(self, features):
         """Exporta cuadrados de grass a CSV con detalles de cada celda"""
@@ -1042,7 +1042,7 @@ class VegetationClassificationCHMTask(QgsTask):
                         })
                         row_idx += 1
         
-        QgsMessageLog.logMessage(f"CSV Grass Areas Exportado: {csv_grass_path} ({row_idx-1} celdas)", "MyLiDAR", Qgis.Success)
+        QgsMessageLog.logMessage(f"CSV Grass Areas Exportado: {csv_grass_path} ({row_idx-1} celdas)", "MyFlamma", Qgis.Success)
 
     def _export_buildings_to_csv(self, features):
         """Exporta edificios detectados a CSV con celdas y coordenadas"""
@@ -1091,7 +1091,7 @@ class VegetationClassificationCHMTask(QgsTask):
                         })
                         row_idx += 1
         
-        QgsMessageLog.logMessage(f"CSV Edificios Exportado: {csv_buildings_path} ({row_idx-1} celdas)", "MyLiDAR", Qgis.Success)
+        QgsMessageLog.logMessage(f"CSV Edificios Exportado: {csv_buildings_path} ({row_idx-1} celdas)", "MyFlamma", Qgis.Success)
 
     def finished(self, result):
         if result:
@@ -1266,11 +1266,11 @@ class VegetationClassificationCHMTask(QgsTask):
                         pc_layer = QgsPointCloudLayer(self.reclassified_laz_path, os.path.basename(self.reclassified_laz_path), "pdal")
                         if pc_layer.isValid():
                             QgsProject.instance().addMapLayer(pc_layer)
-                            QgsMessageLog.logMessage(f"LAZ Reclasificado importado: {os.path.basename(self.reclassified_laz_path)}", "MyLiDAR", Qgis.Success)
+                            QgsMessageLog.logMessage(f"LAZ Reclasificado importado: {os.path.basename(self.reclassified_laz_path)}", "MyFlamma", Qgis.Success)
                         else:
-                            QgsMessageLog.logMessage(f"No se pudo cargar LAZ reclasificado", "MyLiDAR", Qgis.Warning)
+                            QgsMessageLog.logMessage(f"No se pudo cargar LAZ reclasificado", "MyFlamma", Qgis.Warning)
                     except Exception as e:
-                        QgsMessageLog.logMessage(f"Error importando LAZ: {str(e)}", "MyLiDAR", Qgis.Warning)
+                        QgsMessageLog.logMessage(f"Error importando LAZ: {str(e)}", "MyFlamma", Qgis.Warning)
                 
                 # Mensaje Final
                 s = self.stats
@@ -1301,7 +1301,7 @@ class VegetationClassificationCHMTask(QgsTask):
                 }
                 
             except Exception as e:
-                QgsMessageLog.logMessage(str(e), "MyLiDAR", Qgis.Warning)
+                QgsMessageLog.logMessage(str(e), "MyFlamma", Qgis.Warning)
         else:
             err = str(self.exception) if self.exception else "Unknown error"
             QMessageBox.critical(self.parent.iface.mainWindow(), self.tr("Error"), err)

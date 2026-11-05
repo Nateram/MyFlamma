@@ -111,13 +111,12 @@ class MyFlammaPlugin:
             return
 
         resolution = dialog.get_resolution()
-        generate_scenarios = dialog.get_generate_scenarios()
-        generate_only_scenarios = dialog.get_generate_only_scenarios()
+        generate_geotiff = dialog.get_include_geotiff()
         ignition_points = dialog.get_ignition_points()
 
         # Step 2: Create and run the background task
         task_description = f"{self.tr('Exporting to FlamMap GeoTIFF from')} {os.path.basename(input_filename)}"
-        task = FlamMapExportTask(task_description, input_filename, output_filename, resolution, self, self.tr, generate_scenarios, ignition_points, generate_only_scenarios)
+        task = FlamMapExportTask(task_description, input_filename, output_filename, resolution, self, self.tr, generate_geotiff, ignition_points)
         self.running_tasks.append(task)
         QgsApplication.taskManager().addTask(task)
 
