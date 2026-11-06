@@ -117,5 +117,9 @@
   "Output OBJ File": "Archivo OBJ de salida",
   "Select output OBJ file...": "Seleccionar archivo OBJ de salida...",
   "Save OBJ File": "Guardar archivo OBJ",
-  "OBJ Files (*.obj)": "Archivos OBJ (*.obj)"
+  "OBJ Files (*.obj)": "Archivos OBJ (*.obj)",
+  "Output format:": "Formato de salida:",
+  "Save 3D File": "Guardar archivo 3D",
+  "FBX Files (*.fbx)": "Archivos FBX (*.fbx)",
+  "FBX keeps materials and colours in a single file (Unity, Blender, Unreal Engine)": "FBX guarda materiales y colores en un único archivo (Unity, Blender, Unreal Engine)"
 }

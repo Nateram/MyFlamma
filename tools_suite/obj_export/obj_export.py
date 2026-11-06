@@ -27,17 +27,21 @@ from qgis.core import QgsTask, QgsApplication, QgsMessageLog, Qgis
 class ObjWriter:
     """Accumulates vertices, normals and faces, then writes .obj + .mtl."""
 
-    def __init__(self):
+    def __init__(self, materials=None):
         self.vertices = []      # (x, y, z)
+        self.colors = []        # (r, g, b) per vertex, written after xyz
+        self.materials = materials or {}
+        self._current_color = (0.5, 0.5, 0.5)
         self.normals = []       # (nx, ny, nz)
         self.groups = []        # (group_name, material_name, faces[])
         # faces: list of tuples of (v_idx, vn_idx) - 1-based
         self._current_group = None
 
     # --- low-level helpers ---
-    def _vi(self, x, y, z):
+    def _vi(self, x, y, z, color=None):
         """Add a vertex and return its 1-based index."""
         self.vertices.append((x, y, z))
+        self.colors.append(color or self._current_color)
         return len(self.vertices)
 
     def _ni(self, nx, ny, nz):
@@ -52,6 +56,7 @@ class ObjWriter:
             'faces': []
         }
         self.groups.append(self._current_group)
+        self._current_color = self.materials.get(material, {}).get('Kd', self._current_color)
 
     def _add_face(self, verts_normals):
         """verts_normals: list of (v_idx, vn_idx)"""
@@ -162,9 +167,10 @@ class ObjWriter:
             f.write("# MyFlamma OBJ Export\n")
             f.write(f"mtllib {mtl_name}\n\n")
 
-            # vertices
-            for vx, vy, vz in self.vertices:
-                f.write(f"v {vx:.4f} {vy:.4f} {vz:.4f}\n")
+            # vertices with vertex colour (x y z r g b): keeps the scene coloured
+            # in Blender/MeshLab even if the .mtl file is lost or not found
+            for (vx, vy, vz), (cr, cg, cb) in zip(self.vertices, self.colors):
+                f.write(f"v {vx:.4f} {vy:.4f} {vz:.4f} {cr:.4f} {cg:.4f} {cb:.4f}\n")
             f.write("\n")
 
             # normals
@@ -315,8 +321,6 @@ class ObjExportTask(QgsTask):
             z_interp = (1 - s) * ((1 - t) * z00 + t * z01) + s * ((1 - t) * z10 + t * z11)
             return (z_interp - terrain_z_base) * scale
 
-        writer = ObjWriter()
-
         # --- Materials ---
         materials = {
             'mat_ground':       {'Kd': (0.12, 0.12, 0.12), 'd': 1.0},   # very dark grey
@@ -326,6 +330,8 @@ class ObjExportTask(QgsTask):
             'mat_crown':        {'Kd': (0.10, 0.55, 0.10), 'd': 1.0},   # green
             'mat_building':     {'Kd': (0.95, 0.64, 0.14), 'd': 1.0},   # orange
         }
+
+        writer = ObjWriter(materials)
 
         progress_done = 0
         progress_total = (1 if p.get('include_ground') else 0) + \
@@ -421,7 +427,8 @@ class ObjExportTask(QgsTask):
                         obj_z = (origin_z - lidar_y) * scale  # flipped
                         obj_y = (terrain_grid_np[r, c] - terrain_z_base) * scale
 
-                        vert_indices[r, c] = writer._vi(obj_x, obj_y, obj_z)
+                        vert_indices[r, c] = writer._vi(obj_x, obj_y, obj_z,
+                                                        color=materials['mat_ground']['Kd'])
 
                 # We need two groups so we can start one, switch to the other,
                 # and keep adding faces.  Pre-create both groups.
@@ -445,6 +452,8 @@ class ObjExportTask(QgsTask):
                         # Choose material: grass or ground
                         if (c, r) in grass_terrain_keys:
                             target = grass_group
+                            for vi in (v00, v10, v11, v01):
+                                writer.colors[vi - 1] = materials['mat_grass']['Kd']
                         else:
                             target = ground_group
 
@@ -599,12 +608,23 @@ class ObjExportTask(QgsTask):
         # =====================================================================
         #  Write to disk
         # =====================================================================
-        writer.write(self.output_path, materials)
+        formats = p.get('formats', ['obj'])
+        base_path = os.path.splitext(self.output_path)[0]
+        self.written_files = []
+
+        if 'obj' in formats:
+            writer.write(base_path + '.obj', materials)
+            self.written_files += [base_path + '.obj', base_path + '.mtl']
+
+        if 'fbx' in formats:
+            from .fbx_writer import write_fbx
+            write_fbx(base_path + '.fbx', writer, materials)
+            self.written_files.append(base_path + '.fbx')
 
         num_verts = len(writer.vertices)
         num_faces = sum(len(g['faces']) for g in writer.groups)
         QgsMessageLog.logMessage(
-            f"OBJ Export complete: {num_verts} vertices, {num_faces} faces → {self.output_path}",
+            f"3D Export complete: {num_verts} vertices, {num_faces} faces → {', '.join(self.written_files)}",
             "MyFlamma", Qgis.Success
         )
         self.setProgress(100)
@@ -613,12 +633,10 @@ class ObjExportTask(QgsTask):
     def finished(self, result):
         from qgis.PyQt.QtWidgets import QMessageBox
         if result:
-            mtl_path = os.path.splitext(self.output_path)[0] + '.mtl'
+            files = "\n".join(f"  • {path}" for path in getattr(self, 'written_files', [self.output_path]))
             msg = (
-                f"OBJ exported successfully!\n\n"
-                f"Files:\n"
-                f"  • {self.output_path}\n"
-                f"  • {mtl_path}\n\n"
+                f"3D scene exported successfully!\n\n"
+                f"Files:\n{files}\n\n"
                 f"You can import these into Unity, Blender, or any 3D tool."
             )
             self.plugin.iface.messageBar().pushMessage(
@@ -712,7 +730,7 @@ def _do_obj_export(plugin_ref, params, output_path=None):
         # Auto-generate output path in project directory
         base_path = os.path.splitext(data['filename'])[0]
         output_path = base_path + "_3d_scene.obj"
-    if not os.path.splitext(output_path)[1].lower() == '.obj':
+    if os.path.splitext(output_path)[1].lower() not in ('.obj', '.fbx'):
         output_path += '.obj'
 
     task_desc = f"Exporting to OBJ → {os.path.basename(output_path)}"

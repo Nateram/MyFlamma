@@ -70,6 +70,18 @@ class ObjExportDialog(QDialog):
 
         left_layout.addLayout(output_layout)
 
+        # --- Output format ---
+        format_row = QHBoxLayout()
+        format_row.addWidget(QLabel(self.tr_func("Output format:")))
+        self.format_combo = QComboBox()
+        self.format_combo.addItem("OBJ (.obj + .mtl)", ['obj'])
+        self.format_combo.addItem("FBX (.fbx)", ['fbx'])
+        self.format_combo.addItem("OBJ + FBX", ['obj', 'fbx'])
+        self.format_combo.setToolTip(self.tr_func("FBX keeps materials and colours in a single file (Unity, Blender, Unreal Engine)"))
+        self.format_combo.currentIndexChanged.connect(self._on_format_changed)
+        format_row.addWidget(self.format_combo)
+        left_layout.addLayout(format_row)
+
         self.populate_input_layers()
         self.input_combo.currentIndexChanged.connect(self._on_layer_changed)
 
@@ -244,26 +256,49 @@ class ObjExportDialog(QDialog):
     def _browse_output(self):
         default_dir = os.path.dirname(self.get_input_file()) or ""
         default_name = self._default_output_name()
+        ext = self._output_ext()
         path, _ = QFileDialog.getSaveFileName(
             self,
-            self.tr_func("Save OBJ File"),
+            self.tr_func("Save 3D File"),
             os.path.join(default_dir, default_name),
-            self.tr_func("OBJ Files (*.obj)")
+            self.tr_func("FBX Files (*.fbx)") if ext == '.fbx' else self.tr_func("OBJ Files (*.obj)")
         )
         if path:
-            if not path.lower().endswith('.obj'):
-                path += '.obj'
+            path = self._with_ext(path)
             self._updating_output = True
             self.output_edit.setText(path)
             self._updating_output = False
             self.selected_output = path
             self.user_edited_output = True
 
+    def _output_ext(self):
+        """Extension shown in the output field: .fbx only when FBX is the sole format."""
+        return '.fbx' if self.get_formats() == ['fbx'] else '.obj'
+
+    def _with_ext(self, path):
+        """Replace a .obj/.fbx extension (or append one) to match the selected format."""
+        base, ext = os.path.splitext(path)
+        if ext.lower() not in ('.obj', '.fbx'):
+            base = path
+        return base + self._output_ext()
+
+    def _on_format_changed(self, index):
+        text = self.output_edit.text().strip()
+        if text:
+            self._updating_output = True
+            self.output_edit.setText(self._with_ext(text))
+            self._updating_output = False
+            self.selected_output = self.output_edit.text()
+
+    def get_formats(self):
+        """Return the list of formats to export, e.g. ['obj'], ['fbx'] or ['obj', 'fbx']."""
+        return self.format_combo.currentData() or ['obj']
+
     def _default_output_name(self):
         input_file = self.get_input_file()
         if not input_file:
-            return "scene_3d.obj"
-        return os.path.splitext(os.path.basename(input_file))[0] + "_3d_scene.obj"
+            return "scene_3d" + self._output_ext()
+        return os.path.splitext(os.path.basename(input_file))[0] + "_3d_scene" + self._output_ext()
 
     def _update_default_output(self):
         if self.user_edited_output:
@@ -301,18 +336,17 @@ class ObjExportDialog(QDialog):
         return (self.selected_input or "").strip()
 
     def get_output_file(self):
-        """Return output OBJ file path, ensuring a .obj extension."""
+        """Return output file path with the extension of the selected format."""
         path = self.output_edit.text().strip()
         if not path:
             return ""
-        if not path.lower().endswith('.obj'):
-            path += '.obj'
-        return path
+        return self._with_ext(path)
 
     def get_params(self):
         """Return all dialog parameters as a dictionary."""
         return {
             'output_obj': self.get_output_file(),
+            'formats': self.get_formats(),
             'include_ground': self.check_ground.isChecked(),
             'include_trees': self.check_trees.isChecked(),
             'include_shrubs': self.check_shrubs.isChecked(),
